@@ -7,6 +7,8 @@
 
 ### Changed
 - Makefile now generates .cia files
+- icon.png (looks like a pocket now)
+- banner icon.png (text is now a dark green instead of pure black)
 
 ## [v0.1.0 (initial pre-release)](https://github.com/dragos240/Pocket-NLSE/releases/tag/v0.1.0-pre-alpha) - 2016-09-30
 ### Added
