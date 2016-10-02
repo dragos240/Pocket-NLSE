@@ -4,7 +4,7 @@
 - Unburying fossils (on top of where they were in the ground)
 - Watering flowers
 - Map tile editing
-..- Train station locker placement
+ - Train station locker placement
 
 ## Villager options
 - Boxing/Unboxing
@@ -21,7 +21,7 @@
 - Change face
 - Pocket, dresser, and island box editing
 - Change room items/orientation
-..- Train station locker placement
+ - Train station locker placement
 
 ## Other
 - Individual PWP unlocking
