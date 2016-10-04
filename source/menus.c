@@ -36,6 +36,7 @@ int get_loaded_status(){
 		return 1;
 }
 
+//load & save
 void load_garden(){
 	struct stat st;
 
@@ -245,63 +246,206 @@ save_changes_end:
 	is_loaded = 0;
 }
 
-void list_test(){
-	unsigned int i;
+//menus
+
+void map_menu(){
 	int menuindex = 0;
-	int menucount;
+	int menucount = 4;
 
-	char headerstr[] = "Number list";
-	char* list[27];
+	char headerstr[] = "Map options";
+	char* menu_entries[] = {
+		"Grass options",
+		"Unbury fossils (not yet working!)",
+		"Water flowers (not yet working!)",
+		"Map tile editor (not yet working!)"
+	};
+	
+	if(gardenData == NULL){
+			while(1){
+				hidScanInput();
 
-	for(i = 0; i < sizeof(list)/sizeof(list[0]); i++){
-		list[i] = calloc(3, 1);
-		sprintf(list[i], "%d", i);
+				if(hidKeysDown() & KEY_A)
+					break;
+				
+				sf2d_start_frame(GFX_TOP, GFX_LEFT);
+					ui_frame();
+					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Please load a file first!");
+					sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
+				sf2d_end_frame();
+				sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+				sf2d_end_frame();
+				sf2d_swapbuffers();
+			}
+		return;
 	}
 
 	while(1){
-		menucount = sizeof(list)/sizeof(list[0]);
-
-		display_menu(list, menucount, &menuindex, headerstr);
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
 
 		if(menuindex == -1)
 			break;
-
-		while(1){
-			hidScanInput();
-
-			if(hidKeysDown() & KEY_A)
+		
+		switch(menuindex){
+			case 0:
+				grass_menu();
 				break;
-
-			sf2d_start_frame(GFX_TOP, GFX_LEFT);
-				ui_frame();
-				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "menuindex: %d", menuindex);
-				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-			sf2d_end_frame();
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-			sf2d_swapbuffers();
+			case 1:
+				unbury_fossils();
+				break;
+			case 2:
+				water_flowers();
+				break;
+			case 3:
+				map_tile_editor();
+				break;
 		}
-	}
-
-	for(i = 0; i < sizeof(list)/sizeof(list[0]); i++){
-		free(list[i]);
-	}
-	while(1){
-		hidScanInput();
-
-		if(hidKeysDown() & KEY_A)
-			break;
-
-		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Press the A button to continue.");
-		sf2d_end_frame();
-		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-		sf2d_end_frame();
-		sf2d_swapbuffers();
 	}
 }
 
+void player_select(){
+	int i;
+	int player_offset;
+	int menuindex = 0;
+	int menucount = 4;
+
+	char headerstr[] = "Select a player";
+	char* menu_entries[4];
+	
+	if(gardenData == NULL){
+			while(1){
+				hidScanInput();
+
+				if(hidKeysDown() & KEY_A)
+					break;
+				
+				sf2d_start_frame(GFX_TOP, GFX_LEFT);
+					ui_frame();
+					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Please load a file first!");
+					sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
+				sf2d_end_frame();
+				sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+				sf2d_end_frame();
+				sf2d_swapbuffers();
+			}
+		return;
+	}
+
+	for(i = 0; i < 4; i++){
+		menu_entries[i] = calloc(11, 1);
+		player_offset = (0x20+0x9f10*i);
+		menu_entries[i] = (char*)get_ustring(gardenData, player_offset+0x55a8, 10);
+		if(get_ustring(gardenData, (0x20+0x9f10*(i+1))+0x55a8, 1)[0] == '\0')
+			break;
+	}
+	menucount = i+1;
+
+
+	while(1){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+		
+		player_menu(menuindex);
+	}
+
+	for(i = 0; i < menucount; i++){
+		free(menu_entries[i]);
+	}
+}
+
+void villager_select(){
+	int i;
+	int villager_offset;
+	int menuindex = 0;
+	int menucount = 4;
+
+	char headerstr[] = "Select a villager";
+	char* menu_entries[10]; //max of 10 villagers per town
+	
+	if(gardenData == NULL){
+			while(1){
+				hidScanInput();
+
+				if(hidKeysDown() & KEY_A)
+					break;
+				
+				sf2d_start_frame(GFX_TOP, GFX_LEFT);
+					ui_frame();
+					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Please load a file first!");
+					sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
+				sf2d_end_frame();
+				sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+				sf2d_end_frame();
+				sf2d_swapbuffers();
+			}
+		return;
+	}
+
+	for(i = 0; i < 4; i++){
+		menu_entries[i] = calloc(11, 1);
+		villager_offset = (0x20+0x9f10*i);
+		menu_entries[i] = (char*)get_ustring(gardenData, villager_offset+0x55a8, 10);
+	}
+
+	while(1){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+		
+		//villager_menu(menuindex);
+	}
+
+	for(i = 0; i < 4; i++){
+		free(menu_entries[i]);
+	}
+}
+
+void misc_menu(){
+	int menuindex = 0;
+	int menucount = 1;
+
+	char headerstr[] = "Misc options";
+	char* menu_entries[] = {
+		"Unlock all PWPs"
+	};
+	
+	if(gardenData == NULL){
+			while(1){
+				hidScanInput();
+
+				if(hidKeysDown() & KEY_A)
+					break;
+				
+				sf2d_start_frame(GFX_TOP, GFX_LEFT);
+					ui_frame();
+					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Please load a file first!");
+					sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
+				sf2d_end_frame();
+				sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+				sf2d_end_frame();
+				sf2d_swapbuffers();
+			}
+		return;
+	}
+
+	while(1){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+		
+		switch(menuindex){
+			case 0:
+				unlock_all_pwps();
+				break;
+		}
+	}
+}
+
+
+//map menu
 void grass_menu(){
 	int menuindex = 0;
 	int menucount = 2;
@@ -373,62 +517,33 @@ void grass_menu(){
 	}
 }
 
-void player_select(){
-	int i;
-	int player_offset;
-	int menuindex = 0;
-	int menucount = 4;
-
-	char headerstr[] = "Select a player";
-	char* menu_entries[4];
-	
-	if(gardenData == NULL){
-			while(1){
-				hidScanInput();
-
-				if(hidKeysDown() & KEY_A)
-					break;
-				
-				sf2d_start_frame(GFX_TOP, GFX_LEFT);
-					ui_frame();
-					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Please load a file first!");
-					sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-				sf2d_end_frame();
-				sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-				sf2d_end_frame();
-				sf2d_swapbuffers();
-			}
-		return;
-	}
-
-	for(i = 0; i < 4; i++){
-		menu_entries[i] = calloc(11, 1);
-		player_offset = (0x20+0x9f10*i);
-		menu_entries[i] = (char*)get_ustring(gardenData, player_offset+0x55a8, 10);
-	}
-
-	while(1){
-		display_menu(menu_entries, menucount, &menuindex, headerstr);
-
-		if(menuindex == -1)
-			break;
-		
-		player_menu(menuindex);
-	}
-
-	for(i = 0; i < 4; i++){
-		free(menu_entries[i]);
-	}
+void unbury_fossils(){
+	//TODO
 }
 
+void water_flowers(){
+	//TODO
+}
+
+void map_tile_editor(){
+	//TODO
+}
+
+
+//player select & player menu
 void player_menu(int player){
 	int menuindex = 0;
-	int menucount = 2;
+	int menucount = 7;
 
 	char headerstr[] = "Select an option";
 	char* menu_entries[] = {
 		"Max bank",
-		"Change gender"
+		"Change gender (here be dragons!)",
+		"Change tan shade",
+		"Change hair style",
+		"Change hair color",
+		"Change eye color",
+		"Change face type"
 	};
 
 	while(1){
@@ -444,12 +559,28 @@ void player_menu(int player){
 			case 1:
 				change_gender(player);
 				break;
+			case 2:
+				change_tan(player);
+				break;
+			case 3:
+				change_hair_style(player);
+				break;
+			case 4:
+				change_hair_color(player);
+				break;
+			case 5:
+				change_eye_color(player);
+				break;
+			case 6:
+				change_face(player);
+				break;
 		}
 	}
 }
 
 void max_bank(int player){
 	int i;
+	//original IDs
 	int bank_ids[] = {0x78,0x56,0xf9,0x8c,0x36,0x86,0x11,0x0d};
 	int bank_offset = (0x20+0x9f10*player)+0x6b6c;
 
@@ -495,6 +626,25 @@ void change_gender(int player){
 	};
 
 	while(1){
+		hidScanInput();
+
+		if(hidKeysDown() & KEY_A)
+			break;
+		else if(hidKeysDown() & KEY_B)
+			return;
+
+		sf2d_start_frame(GFX_TOP, GFX_LEFT);
+			ui_frame();
+			sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Warning! This will make your villagers forget who you");
+			sftd_draw_text(font, 0, fontheight*3, COLOR_WHITE, fontheight, "are! Press A if you still wish to continue, otherwise,");
+			sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "press B.");
+		sf2d_end_frame();
+		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+		sf2d_end_frame();
+		sf2d_swapbuffers();
+	}
+
+	while(1){
 		display_menu(menu_entries, menucount, &menuindex, headerstr);
 
 		if(menuindex == -1)
@@ -531,6 +681,226 @@ void change_gender(int player){
 	}
 }
 
+void change_tan(int player){
+	int player_offset = 0x20+0x9f10*player;
+	int menuindex = 0;
+	int menucount = 16;
+
+	char headerstr[] = "Select tan value";
+	char* menu_entries[16] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"};
+
+	while(1){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+		
+		storeByte(gardenData, player_offset+0x8, (u8)menuindex);
+
+		while(1){
+			hidScanInput();
+
+			if(hidKeysDown() & KEY_A)
+				break;
+
+			sf2d_start_frame(GFX_TOP, GFX_LEFT);
+				ui_frame();
+				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Changing tan value to %d... Done!", menuindex);
+				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
+			sf2d_end_frame();
+			sf2d_start_frame(GFX_BOTTOM, GFX_TOP);
+			sf2d_end_frame();
+			sf2d_swapbuffers();
+		}
+	}
+}
+
+void change_hair_style(int player){
+	int i;
+	int player_offset = 0x20+0x9f10*player;
+	int menuindex = 0;
+	int menucount = 34;
+
+	char headerstr[] = "Select a hair style";
+	char* menu_entries[34]; //0-16 Male, 17-34 Female
+
+	for(i = 0; i < 17; i++){
+		menu_entries[i] = calloc(8, 1); //Male + ' ' + 2 chars + \0 = 8
+		snprintf(menu_entries[i], 8, "Male %d", i);
+		menu_entries[i+17] = calloc(10, 1);
+		snprintf(menu_entries[i+17], 10, "Female %d", i);
+	}
+	menu_entries[16] = calloc(17, 1);
+	snprintf(menu_entries[16], 16, "Male (beadhead)");
+	menu_entries[16+17] = calloc(19, 1);
+	snprintf(menu_entries[16+17], 18, "Female (beadhead)");
+
+	while(1){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+
+		storeByte(gardenData, player_offset+0x04, (u8)menuindex);
+
+		while(1){
+			hidScanInput();
+
+			if(hidKeysDown() & KEY_A)
+				break;
+
+			sf2d_start_frame(GFX_TOP, GFX_LEFT);
+				ui_frame();
+				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Changing hair style to %s... Done!", menu_entries[menuindex]);
+				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
+			sf2d_end_frame();
+			sf2d_start_frame(GFX_BOTTOM, GFX_TOP);
+			sf2d_end_frame();
+			sf2d_swapbuffers();
+		}
+	}
+	//TODO free dat shit!
+}
+
+void change_hair_color(int player){
+	int player_offset = 0x20+0x9f10*player;
+	int menuindex = 0;
+	int menucount = 16;
+
+	char headerstr[] = "Select a hair color";
+	char* menu_entries[] = {
+		"Dark brown",
+		"Light brown",
+		"Orange",
+		"Light blue",
+		"Gold",
+		"Light green",
+		"Pink",
+		"White",
+		"Black",
+		"Auburn",
+		"Red",
+		"Dark blue",
+		"Blonde",
+		"Dark green",
+		"Light purple",
+		"Ash brown"
+	};
+
+	while(1){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+
+		storeByte(gardenData, player_offset+0x05, (u8)menuindex);
+
+		while(1){
+			hidScanInput();
+
+			if(hidKeysDown() & KEY_A)
+				break;
+
+			sf2d_start_frame(GFX_TOP, GFX_LEFT);
+				ui_frame();
+				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Changing hair color to %s... Done!", menu_entries[menuindex]);
+				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
+			sf2d_end_frame();
+			sf2d_start_frame(GFX_BOTTOM, GFX_TOP);
+			sf2d_end_frame();
+			sf2d_swapbuffers();
+		}
+	}
+}
+
+void change_eye_color(int player){
+	int player_offset = 0x20+0x9f10*player;
+	int menuindex = 0;
+	int menucount = 8;
+
+	char headerstr[] = "Select a eye color";
+	char* menu_entries[] = {"0", "1", "2", "3", "4", "5", "6", "7"};
+
+	while(1){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+
+		storeByte(gardenData, player_offset+0x07, (u8)menuindex);
+
+		while(1){
+			hidScanInput();
+
+			if(hidKeysDown() & KEY_A)
+				break;
+
+			sf2d_start_frame(GFX_TOP, GFX_LEFT);
+				ui_frame();
+				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Changing eye color to %d... Done!", menuindex);
+				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
+			sf2d_end_frame();
+			sf2d_start_frame(GFX_BOTTOM, GFX_TOP);
+			sf2d_end_frame();
+			sf2d_swapbuffers();
+		}
+	}
+}
+
+void change_face(int player){
+	int player_offset = 0x20+0x9f10*player;
+	int menuindex = 0;
+	int menucount = 12;
+
+	char headerstr[] = "Select a face type";
+	char* menu_entries[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
+
+	while(1){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+
+		storeByte(gardenData, player_offset+0x06, (u8)menuindex);
+
+		while(1){
+			hidScanInput();
+
+			if(hidKeysDown() & KEY_A)
+				break;
+
+			sf2d_start_frame(GFX_TOP, GFX_LEFT);
+				ui_frame();
+				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Changing face type to %d... Done!", menuindex);
+				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
+			sf2d_end_frame();
+			sf2d_start_frame(GFX_BOTTOM, GFX_TOP);
+			sf2d_end_frame();
+			sf2d_swapbuffers();
+		}
+	}
+}
+
+
+//villager select & villager menu
+void villager_menu(){
+	//TODO
+}
+
+void box_menu(){
+	//TODO
+}
+
+void reset_villager(){
+	//TODO
+}
+
+void change_villager(){
+	//TODO
+}
+
+
+//misc menu
 void unlock_all_pwps(){
 	unsigned int i;
 	char* str;
@@ -573,6 +943,65 @@ void unlock_all_pwps(){
 			str = "Unlocking all PWPs... ";
 			sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "%s Done!", str);
 			sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
+		sf2d_end_frame();
+		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+		sf2d_end_frame();
+		sf2d_swapbuffers();
+	}
+}
+
+
+//list test
+void list_test(){
+	unsigned int i;
+	int menuindex = 0;
+	int menucount;
+
+	char headerstr[] = "Number list";
+	char* list[27];
+
+	for(i = 0; i < sizeof(list)/sizeof(list[0]); i++){
+		list[i] = calloc(3, 1);
+		sprintf(list[i], "%d", i);
+	}
+
+	while(1){
+		menucount = sizeof(list)/sizeof(list[0]);
+
+		display_menu(list, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+
+		while(1){
+			hidScanInput();
+
+			if(hidKeysDown() & KEY_A)
+				break;
+
+			sf2d_start_frame(GFX_TOP, GFX_LEFT);
+				ui_frame();
+				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "menuindex: %d", menuindex);
+				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
+			sf2d_end_frame();
+			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_end_frame();
+			sf2d_swapbuffers();
+		}
+	}
+
+	for(i = 0; i < sizeof(list)/sizeof(list[0]); i++){
+		free(list[i]);
+	}
+	while(1){
+		hidScanInput();
+
+		if(hidKeysDown() & KEY_A)
+			break;
+
+		sf2d_start_frame(GFX_TOP, GFX_LEFT);
+			ui_frame();
+			sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Press the A button to continue.");
 		sf2d_end_frame();
 		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
 		sf2d_end_frame();

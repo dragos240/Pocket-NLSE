@@ -20,7 +20,7 @@ void run_tests(){
 	//mintest();
 	//menu_test();
 	//ui_test();
-	kb_test();
+	//kb_test();
 	//dir_test();
 }
 

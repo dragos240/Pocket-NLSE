@@ -38,9 +38,10 @@ int main(){
 
 	char* menu_entries[] = {
 		"Open garden.dat (do this first!)",
-		"Grass options",
-		"Player specific options",
-		"Unlock all PWPs",
+		"Map options",
+		"Player options",
+		"Villager options (nothing here yet!)",
+		"Misc options",
 		"Save garden.dat (do this last!)",
 		"List test"
 	};
@@ -50,9 +51,9 @@ int main(){
 	while(1){
 menus_test_loop_start:
 		if(debug == 2)
-			menucount = 6;
+			menucount = 7;
 		else
-			menucount = 5;
+			menucount = 6;
 
 		memset(headerstr, 0, sizeof(headerstr));
 		snprintf(headerstr, sizeof(headerstr)-1, "Pocket NLSE");
@@ -78,20 +79,23 @@ menus_test_loop_start:
 					is_loaded = 1;
 				break;
 			case 1:
-				grass_menu();
+				map_menu();
 				break;
 			case 2:
 				player_select();
 				break;
 			case 3:
-				unlock_all_pwps();
+				//villager_select();
 				break;
 			case 4:
+				misc_menu();
+				break;
+			case 5:
 				save_changes();
 				if(get_loaded_status() == 0)
 					is_loaded = 0;
 				break;
-			case 5:
+			case 6:
 				list_test();
 				break;
 		}

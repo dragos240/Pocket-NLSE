@@ -145,11 +145,18 @@ $(BUILD):
 
 #---------------------------------------------------------------------------------
 clean:
-	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).elf
+	echo clean ...
+	rm -rf $(BUILD) $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).elf $(TARGET).cia
 
 citra:
 	citra-qt $(TARGET).3dsx
+
+cia:
+	#bannertool makebanner -i res/banner\ icon.png -a res/nltheme.wav -o banner.bnr
+	bannertool makebanner -i res/banner\ icon.png -a res/audio.wav -o banner.bnr
+	bannertool makesmdh -s "Pocket-NLSE" -l "Pocket-NLSE" -p "Dragos240" -i icon.png -o icon.icn
+	makerom -f cia -o Pocket-NLSE.cia -rsf res/Pocket-NLSE.rsf -target t -exefslogo -elf Pocket-NLSE.elf -icon icon.icn -banner banner.bnr
+	rm -f banner.bnr icon.icn
 
 #---------------------------------------------------------------------------------
 else
