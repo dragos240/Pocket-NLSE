@@ -22,7 +22,7 @@
 u8* gardenData = NULL;
 
 static u32 fontheight = 11;
-static u32 debug = 0; //1 = Run tests, 2 = include debug menus
+u32 debug = 0; //1 = Run tests, 2 = include debug menus
 
 int main(){
 	setIs3dsx();

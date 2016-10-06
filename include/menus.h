@@ -39,7 +39,7 @@ void change_face(int player);
 //villager select & villager menu
 void villager_menu(int villager);
 
-void box_menu(int villager);
+void toggle_boxed(int villager);
 void reset_villager(int villager);
 void set_villager(int villager);
 
@@ -49,5 +49,6 @@ void unlock_all_pwps();
 //debug menus
 void list_test();
 void view_apt_id();
+void display_status_id(int villager);
 
 #endif

@@ -381,6 +381,8 @@ void villager_select(){
 	int i, j;
 	int villager_offset;
 	u16 id; //villager ID
+	u32 status;
+	bool is_boxed[10];
 	int menuindex = 0;
 	int menucount = 0;
 
@@ -408,34 +410,51 @@ void villager_select(){
 		return;
 	}
 
-	for(i = 0; i < 10; i++){
-		villager_offset = OFFSET_VILLAGERS+SIZE_VILLAGER*i;
-		id = readByte2(gardenData, villager_offset);
-		if(id > 0x14c || id == 0xffff){
-			if(id == 0xffff)
-				menu_entries[i] = "(Empty slot!)";
-			else{
+	while(aptMainLoop()){
+		for(i = 0; i < 10; i++){
+			villager_offset = OFFSET_VILLAGERS+SIZE_VILLAGER*i;
+			id = readByte2(gardenData, villager_offset);
+			status = readByte4(gardenData, villager_offset+OFFSET_VILLAGER_STATUS);
+			if(id > 0x14c || id == 0xffff){
+				if(id == 0xffff)
+					menu_entries[i] = "(Empty slot!)";
+				else{
+					menucount = i+1;
+					break;
+				}
+			}
+			if(status == (status | 0x00000001))
+				is_boxed[i] = true;
+			else
+				is_boxed[i] = false;
+
+			if(id < 0x14c && i == 9)
 				menucount = i+1;
-				break;
+
+			for(j = 0; j < 333; j++){
+				if(id == villagers[j].id){
+					if(is_boxed[i]){
+						menu_entries[i] = calloc(strlen(villagers[j].name)+9, 1);
+						strcat(menu_entries[i], villagers[j].name);
+						strcat(menu_entries[i], " (boxed)");
+					}
+					else
+						menu_entries[i] = villagers[j].name;
+				}
 			}
 		}
 
-		if(id < 0x14c && i == 9)
-			menucount = i+1;
-
-		for(j = 0; j < 333; j++){
-			if(id == villagers[j].id)
-				menu_entries[i] = villagers[j].name;
-		}
-	}
-
-	while(aptMainLoop()){
 		display_menu(menu_entries, menucount, &menuindex, headerstr);
 
 		if(menuindex == -1)
 			break;
 		
 		villager_menu(menuindex);
+	}
+
+	for(i = 0; i < 10; i++){
+		if(is_boxed[i])
+			free(menu_entries[i]);
 	}
 }
 
@@ -1173,13 +1192,12 @@ void change_face(int player){
 
 //villager select & villager menu
 void villager_menu(int villager){
-	//int villager_offset = OFFSET_VILLAGERS+SIZE_VILLAGER*villager;
 	int menuindex = 0;
 	int menucount = 3;
 
 	char headerstr[] = "Select an option";
 	char* menu_entries[] = {
-		"Boxing options",
+		"Toggle whether boxed",
 		"Reset villager to default settings",
 		"Set villager"
 	};
@@ -1192,7 +1210,7 @@ void villager_menu(int villager){
 
 		switch(menuindex){
 			case 0:
-				box_menu(villager);
+				toggle_boxed(villager);
 				break;
 			case 1:
 				reset_villager(villager);
@@ -1205,15 +1223,19 @@ void villager_menu(int villager){
 }
 
 void box_menu(int villager){
-	villager = villager;
-	//int villager_offset = OFFSET_VILLAGERS+SIZE_VILLAGER*villager;
+	//legacy menu, here for future reference
 	int menuindex = 0;
-	int menucount = 2;
+	int menucount;
+	if(debug == 2)
+		menucount = 3;
+	else
+		menucount = 2;
 
 	char headerstr[] = "Select an option";
 	char* menu_entries[] = {
 		"Box villager",
-		"Unbox villager"
+		"Unbox villager",
+		"Display status IDs"
 	};
 
 	while(aptMainLoop()){
@@ -1224,12 +1246,50 @@ void box_menu(int villager){
 
 		switch(menuindex){
 			case 0:
-				//TODO
+				//box_villager(villager);
 				break;
 			case 1:
-				//TODO
+				//unbox_villager(villager);
+				break;
+			case 2:
+				display_status_id(villager);
 				break;
 		}
+	}
+}
+
+void toggle_boxed(int villager){
+	int villager_offset = OFFSET_VILLAGERS+SIZE_VILLAGER*villager;
+	u32 status = readByte4(gardenData, villager_offset+OFFSET_VILLAGER_STATUS);
+	char* str;
+	
+	if(status == (status | 0x00000001)){ //check if last byte is odd (boxed)
+		str = "Unboxing";
+		status = (status & ~0x00000001); //unbox villager
+	}
+	else{
+		str = "Boxing";
+		status = (status | 0x00000001); //box villager
+	}
+
+	storeByte(gardenData, villager_offset+OFFSET_VILLAGER_STATUS, (status & 0x000000ff));
+
+	while(aptMainLoop()){
+		hidScanInput();
+
+		if(hidKeysDown() & KEY_A)
+			break;
+
+		sf2d_start_frame(GFX_TOP, GFX_LEFT);
+			ui_frame();
+			sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "%s villager... Done!", str);
+			sftd_draw_text(font, 0, fontheight*3, COLOR_WHITE, fontheight, "Press the A key to continue.");
+		sf2d_end_frame();
+		if(is3dsx){
+			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_end_frame();
+		}
+		sf2d_swapbuffers();
 	}
 }
 
@@ -1239,8 +1299,11 @@ void reset_villager(int villager){
 }
 
 void set_villager(int villager){
-	villager = villager;
 	//TODO
+	u16 id = 0;
+	int villager_offset = OFFSET_VILLAGERS+SIZE_VILLAGER*villager;
+	id = id;
+	villager_offset = villager_offset;
 }
 
 
@@ -1389,4 +1452,26 @@ void view_apt_id(){
 	}
 	
 	sf2d_set_clear_color(RGBA8(0x00, 0x2e, 0x00, 0xFF));
+}
+
+void display_status_id(int villager){
+	int villager_offset = OFFSET_VILLAGERS+SIZE_VILLAGER*villager;
+	u32 status_id = readByte4(gardenData, villager_offset+OFFSET_VILLAGER_STATUS);
+	while(aptMainLoop()){
+		hidScanInput();
+
+		if(hidKeysDown() & KEY_A)
+			break;
+
+		sf2d_start_frame(GFX_TOP, GFX_LEFT);
+			ui_frame();
+			sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Status ID: 0x%x", status_id);
+			sftd_draw_text(font, 0, fontheight*3, COLOR_WHITE, fontheight, "Press the A key to continue.");
+		sf2d_end_frame();
+		if(is3dsx){
+			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_end_frame();
+		}
+		sf2d_swapbuffers();
+	}
 }

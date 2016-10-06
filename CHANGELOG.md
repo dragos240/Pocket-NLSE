@@ -18,7 +18,7 @@
  - Water flowers (Not yet working!)
  - Map tile editor (Not yet working!)
 - Villager options
- - Box villager (Not yet working!)
+ - Toggle whether villager is boxed (Working as of this commit!)
  - Reset villager (Not yet working!)
  - Change villager (Not yet working!)
 - Misc options
