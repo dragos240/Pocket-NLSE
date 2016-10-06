@@ -20,7 +20,14 @@ void map_tile_editor();
 
 //player select & player menu
 void player_menu(int player);
-void max_bank(int player);
+
+void bank_menu(int player);
+	//bank menu
+	void select_bank_balance(int player);
+	void set_bank_balance(int player, int menuindex);
+	void max_bank(int player);
+	void wipe_bank(int player);
+	void view_bank_ids(int player);
 void change_gender(int player);
 void change_tan(int player);
 void change_hair_style(int player);
@@ -28,16 +35,19 @@ void change_hair_color(int player);
 void change_eye_color(int player);
 void change_face(int player);
 
+
 //villager select & villager menu
-void villager_menu();
-void box_menu();
-void reset_villager();
-void change_villager();
+void villager_menu(int villager);
+
+void box_menu(int villager);
+void reset_villager(int villager);
+void set_villager(int villager);
 
 //misc menu
 void unlock_all_pwps();
 
-//list test
+//debug menus
 void list_test();
+void view_apt_id();
 
 #endif

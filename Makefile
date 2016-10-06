@@ -74,6 +74,12 @@ LIBDIRS	:= $(CTRULIB) $(PORTLIBS)
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 #---------------------------------------------------------------------------------
 
+export GITREV	:= $(shell git rev-parse HEAD 2>/dev/null | cut -c1-8)
+export VERSION_MAJOR	:= 0
+export VERSION_MINOR	:= 1
+export VERSION_BUGFIX	:= 0
+export VERSION	:= $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_BUGFIX)-$(GITREV)
+
 export OUTPUT	:=	$(CURDIR)/$(TARGET)
 export TOPDIR	:=	$(CURDIR)
 
@@ -152,11 +158,11 @@ citra:
 	citra-qt $(TARGET).3dsx
 
 cia:
-	#bannertool makebanner -i res/banner\ icon.png -a res/nltheme.wav -o banner.bnr
-	bannertool makebanner -i res/banner\ icon.png -a res/audio.wav -o banner.bnr
-	bannertool makesmdh -s "Pocket-NLSE" -l "Pocket-NLSE" -p "Dragos240" -i icon.png -o icon.icn
-	makerom -f cia -o Pocket-NLSE.cia -rsf res/Pocket-NLSE.rsf -target t -exefslogo -elf Pocket-NLSE.elf -icon icon.icn -banner banner.bnr
-	rm -f banner.bnr icon.icn
+	@bannertool makebanner -i res/banner\ icon.png -a res/audio.wav -o banner.bnr
+	@bannertool makesmdh -s "Pocket-NLSE" -l "Pocket-NLSE" -p "Dragos240" -i icon.png -o icon.icn
+	@makerom -f cia -o Pocket-NLSE.cia -rsf res/Pocket-NLSE.rsf -target t -exefslogo -elf Pocket-NLSE.elf \
+	  -ver "$(VERSION)" -icon icon.icn -banner banner.bnr
+	@rm -f banner.bnr icon.icn
 
 #---------------------------------------------------------------------------------
 else

@@ -6,6 +6,7 @@
 #include <sf2d.h>
 #include <sftd.h>
 
+#include "common.h"
 #include "menu.h"
 #include "gfx.h"
 #include "ui.h"
@@ -32,7 +33,7 @@ char* browse_dir(char* headerstr){
 	curdir = calloc(2, 1);curdir[0]='/';
 	path = calloc(2, 1);path[0]='/';
 
-	while(1){
+	while(aptMainLoop()){
 		char str[500];
 		snprintf(str, 500, "%s - %s", headerstr, curdir);
 		menuindex = 0;
@@ -44,8 +45,10 @@ char* browse_dir(char* headerstr){
 				ui_frame();
 				sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Calculating number of files/dirs...");
 			sf2d_end_frame();
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
+			if(is3dsx){
+				sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+				sf2d_end_frame();
+			}
 			sf2d_swapbuffers();
 			dirsize++;
 		}
@@ -106,4 +109,5 @@ char* browse_dir(char* headerstr){
 			return path;
 		}
 	}
+	return "";
 }

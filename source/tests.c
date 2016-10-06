@@ -3,6 +3,7 @@
 #include <sftd.h>
 #include <sfil.h>
 
+#include "common.h"
 #include "log.h"
 #include "gfx.h"
 #include "menu.h"
@@ -31,7 +32,7 @@ void dir_test(){
 
 	path = browse_dir("Load garden.dat");
 
-	while(1){
+	while(aptMainLoop()){
 		hidScanInput();
 		if(hidKeysDown() & KEY_A)
 			break;
@@ -43,8 +44,10 @@ void dir_test(){
 
 		sftd_draw_textf(font, 0, 2*fontheight, COLOR_WHITE, fontheight, "Press the A button to continue.\n");
 		sf2d_end_frame();
-		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-		sf2d_end_frame();
+		if(is3dsx){
+			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_end_frame();
+		}
 		sf2d_swapbuffers();
 	}
 
@@ -58,7 +61,7 @@ void kb_test(){
 	char* str = draw_kb(NULL);
 	kb_fini();
 
-	while(1){
+	while(aptMainLoop()){
 		hidScanInput();
 
 		if(hidKeysDown() & KEY_A)
@@ -71,8 +74,10 @@ void kb_test(){
 			sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "You entered: %s", str);
 			sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
 		sf2d_end_frame();
-		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-		sf2d_end_frame();
+		if(is3dsx){
+			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_end_frame();
+		}
 		sf2d_swapbuffers();
 	}
 
@@ -82,7 +87,7 @@ void kb_test(){
 void ui_test(){	
 	gfx_init();
 
-	while(1){
+	while(aptMainLoop()){
 		hidScanInput();
 
 		if(hidKeysDown() & KEY_START)
@@ -91,8 +96,10 @@ void ui_test(){
 		sf2d_start_frame(GFX_TOP, GFX_LEFT);
 			ui_frame();
 		sf2d_end_frame();
-		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-		sf2d_end_frame();
+		if(is3dsx){
+			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_end_frame();
+		}
 		sf2d_swapbuffers();
 	}
 
@@ -113,7 +120,7 @@ void menu_test(){
 
 	display_menu(menu_entries, total_entries, &menupos, headerstr);
 
-	while(1){
+	while(aptMainLoop()){
 		hidScanInput();
 		if(hidKeysDown() & KEY_A)
 			break;
@@ -128,8 +135,10 @@ void menu_test(){
 
 		sftd_draw_textf(font, 0, 2*fontheight, COLOR_WHITE, fontheight, "Press the A button to continue.\n");
 		sf2d_end_frame();
-		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-		sf2d_end_frame();
+		if(is3dsx){
+			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_end_frame();
+		}
 		sf2d_swapbuffers();
 	}
 
@@ -150,9 +159,10 @@ void mintest(){
 			//sf2d_draw_texture(arrow, 0, 0);
 			//sftd_draw_textf(font, 0, fontheight, COLOR_WHITE, fontheight, "Some text");
 		sf2d_end_frame();
-
-		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-		sf2d_end_frame();
+		if(is3dsx){
+			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_end_frame();
+		}
 		sf2d_swapbuffers();
 	}
 

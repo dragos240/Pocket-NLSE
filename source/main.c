@@ -6,6 +6,7 @@
 #include <sftd.h>
 #include <sfil.h>
 
+#include "common.h"
 #include "log.h"
 #include "gfx.h"
 #include "menu.h"
@@ -21,9 +22,10 @@
 u8* gardenData = NULL;
 
 static u32 fontheight = 11;
-static u32 debug = 0; //1 - Run tests, 2 = include list_test()
+static u32 debug = 0; //1 = Run tests, 2 = include debug menus
 
 int main(){
+	setIs3dsx();
 	if(debug == 1){
 		run_tests();
 		return 0;
@@ -40,18 +42,19 @@ int main(){
 		"Open garden.dat (do this first!)",
 		"Map options",
 		"Player options",
-		"Villager options (nothing here yet!)",
+		"Villager options",
 		"Misc options",
 		"Save garden.dat (do this last!)",
-		"List test"
+		"List test",
+		"View APT ID"
 	};
 
 	gfx_init();
 
-	while(1){
+	while(aptMainLoop()){
 menus_test_loop_start:
 		if(debug == 2)
-			menucount = 7;
+			menucount = 8;
 		else
 			menucount = 6;
 
@@ -85,7 +88,7 @@ menus_test_loop_start:
 				player_select();
 				break;
 			case 3:
-				//villager_select();
+				villager_select();
 				break;
 			case 4:
 				misc_menu();
@@ -98,12 +101,15 @@ menus_test_loop_start:
 			case 6:
 				list_test();
 				break;
+			case 7:
+				view_apt_id();
+				break;
 		}
 	}
 
 menus_test_exit:
 
-	while(1){
+	while(aptMainLoop()){
 		hidScanInput();
 
 		if(hidKeysDown() & KEY_START)
@@ -113,13 +119,14 @@ menus_test_exit:
 			ui_frame();
 			sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Press the START button to exit.");
 		sf2d_end_frame();
-		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-		sf2d_end_frame();
+		if(is3dsx){
+			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_end_frame();
+		}
 		sf2d_swapbuffers();
 	}
 
 	gfx_fini();
-	
 
 	return 0;
 }

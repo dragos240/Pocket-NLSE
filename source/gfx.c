@@ -6,6 +6,7 @@
 #include <sftd.h>
 #include <sfil.h>
 
+#include "common.h"
 #include "log.h"
 #include "ui.h"
 #include "gfx.h"
@@ -42,7 +43,7 @@ void gfx_fini(){
 }
 
 void gfx_waitbutton(){
-	while(1){
+	while(aptMainLoop()){
 		hidScanInput();
 
 		if(hidKeysDown() & KEY_A)
@@ -52,8 +53,10 @@ void gfx_waitbutton(){
 			ui_frame();
 			sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Press the A button to continue.\n");
 		sf2d_end_frame();
-		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-		sf2d_end_frame();
+		if(is3dsx){
+			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_end_frame();
+		}
 		sf2d_swapbuffers();
 	}
 }
@@ -61,7 +64,7 @@ void gfx_waitbutton(){
 int gfx_prompt(char* message, char* keymsg){
 	if(keymsg==NULL)keymsg = "A = Yes, B = No.";
 
-	while(1){
+	while(aptMainLoop()){
 		hidScanInput();
 
 		if(hidKeysDown() & KEY_A)
@@ -74,8 +77,10 @@ int gfx_prompt(char* message, char* keymsg){
 			sftd_draw_textf(font, 0, fontheight*2, RGBA8(0xFF, 0xFF, 0xFF, 0xFF), fontheight, "%s", message);
 			sftd_draw_textf(font, 0, fontheight*4, RGBA8(0xFF, 0xFF, 0xFF, 0xFF), fontheight, "%s", keymsg);
 		sf2d_end_frame();
-		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-		sf2d_end_frame();
+		if(is3dsx){
+			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_end_frame();
+		}
 		sf2d_swapbuffers();
 	}
 
@@ -83,7 +88,7 @@ int gfx_prompt(char* message, char* keymsg){
 }
 
 int gfx_prompt3(char* message, char* keymsg){
-	while(1){
+	while(aptMainLoop()){
 		hidScanInput();
 
 		if(hidKeysDown() & KEY_A)
@@ -98,8 +103,10 @@ int gfx_prompt3(char* message, char* keymsg){
 			sftd_draw_textf(font, 0, fontheight*2, RGBA8(0xFF, 0xFF, 0xFF, 0xFF), fontheight, "%s", message);
 			sftd_draw_textf(font, 0, fontheight*4, RGBA8(0xFF, 0xFF, 0xFF, 0xFF), fontheight, "%s", keymsg);
 		sf2d_end_frame();
-		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-		sf2d_end_frame();
+		if(is3dsx){
+			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_end_frame();
+		}
 		sf2d_swapbuffers();
 	}
 

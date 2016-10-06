@@ -18,7 +18,7 @@ void display_menu(char **menu_entries, int total_entries, int *menupos, char *he
 	int rows = 21; //27 changed to 21 due to font size changing
 	int startpos = 0;
 
-	while(1){
+	while(aptMainLoop()){
 		hidScanInput();
 		
 		kDown = hidKeysDown();
