@@ -1,3 +1,5 @@
+#include <locale.h>
+
 #include <3ds.h>
 #include <sf2d.h>
 #include <sftd.h>
@@ -12,17 +14,60 @@
 #include "kb.h"
 #include "dir.h"
 #include "menus.h"
+#include "backup.h"
 #include "tests.h"
 
 static int fontheight = 11;
 //static int fontwidth = 7;
 
 void run_tests(){
+	backup_test();
+	//utf_8_test();
 	//mintest();
 	//menu_test();
 	//ui_test();
 	//kb_test();
 	//dir_test();
+}
+
+void backup_test(){
+	Result ret;
+
+	gfx_init();
+
+	gfx_displaymessage("Backing up cartridge...");
+
+	ret = backup_init();
+	if(ret){
+		gfx_error(ret, __LINE__);
+	}
+
+	//backup_to_dir("backup");
+	//restore_from_dir("backup");
+
+	backup_fini();
+
+	gfx_waitmessage("Done! (hopefully)");
+
+	gfx_fini();
+}
+
+void utf_8_test(){
+	gfx_init();
+
+	sf2d_start_frame(GFX_TOP, GFX_LEFT);
+		sftd_draw_textf(unifont, 0, 0, COLOR_WHITE, fontheight, u8"それはテスト。");
+	sf2d_end_frame();
+	sf2d_swapbuffers();
+
+	while(aptMainLoop()){
+		hidScanInput();
+
+		if(hidKeysDown() & KEY_A)
+			break;
+	}
+
+	gfx_fini();
 }
 
 void dir_test(){

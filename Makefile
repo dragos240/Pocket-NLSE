@@ -164,6 +164,12 @@ cia:
 	  -ver "$(VERSION)" -icon icon.icn -banner banner.bnr
 	@rm -f banner.bnr icon.icn
 
+zip:
+	rm -rf Pocket-NLSE-latest
+	mkdir Pocket-NLSE-latest
+	cp $(TARGET).3dsx $(OUTPUT).smdh Pocket-NLSE-latest
+	zip -r Pocket-NLSE-latest.zip Pocket-NLSE-latest/
+
 #---------------------------------------------------------------------------------
 else
 

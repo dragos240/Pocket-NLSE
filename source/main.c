@@ -15,6 +15,7 @@
 #include "kb.h"
 #include "dir.h"
 #include "menus.h"
+#include "backup.h"
 #include "tests.h"
 
 //static const u32 second = 1000000000;
@@ -22,14 +23,21 @@
 u8* gardenData = NULL;
 
 static u32 fontheight = 11;
-u32 debug = 0; //1 = Run tests, 2 = include debug menus
+u32 debug = 0; //1 = Run tests
+bool devmode = false;
 
 int main(){
+	Result ret;
+
 	setIs3dsx();
 	if(debug == 1){
 		run_tests();
 		return 0;
 	}
+
+	hidScanInput();
+	if((hidKeysHeld() & KEY_L) && (hidKeysHeld() & KEY_R))
+		devmode = true;
 
 	int is_loaded = 0;
 
@@ -39,21 +47,25 @@ int main(){
 	char headerstr[1024];
 
 	char* menu_entries[] = {
-		"Open garden.dat (do this first!)",
+		"Load/restore options (do this first!)",
 		"Map options",
 		"Player options",
 		"Villager options",
 		"Misc options",
-		"Save garden.dat (do this last!)",
+		"Save/inject options (do this last!)",
 		"List test",
 		"View APT ID"
 	};
 
 	gfx_init();
+	ret = backup_init();
+	if(ret){
+		gfx_error(ret, __LINE__);
+	}
 
 	while(aptMainLoop()){
 menus_test_loop_start:
-		if(debug == 2)
+		if(devmode == true)
 			menucount = 8;
 		else
 			menucount = 6;
@@ -77,7 +89,7 @@ menus_test_loop_start:
 
 		switch(menuindex){
 			case 0:
-				load_garden();
+				load_menu();
 				if(get_loaded_status() == 1)
 					is_loaded = 1;
 				break;
@@ -94,7 +106,7 @@ menus_test_loop_start:
 				misc_menu();
 				break;
 			case 5:
-				save_changes();
+				save_menu();
 				if(get_loaded_status() == 0)
 					is_loaded = 0;
 				break;
@@ -126,6 +138,9 @@ menus_test_exit:
 		sf2d_swapbuffers();
 	}
 
+	ret = backup_fini();
+	if(ret)
+		gfx_error(ret, __LINE__);
 	gfx_fini();
 
 	return 0;

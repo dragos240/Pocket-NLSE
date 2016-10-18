@@ -1,12 +1,14 @@
 #ifndef NLSE_GFX_H
 #define NLSE_GFX_H
 
+#include <3ds.h>
 #include <sf2d.h>
 #include <sftd.h>
 
 extern sf2d_texture* arrow;
 extern sftd_font* font;
 extern sftd_font* font_bold;
+extern sftd_font* unifont;
 
 typedef struct{
 	int x;
@@ -24,5 +26,8 @@ void gfx_fini();
 void gfx_waitbutton();
 int gfx_prompt(char* message, char* keymsg);
 int gfx_prompt3(char* message, char* keymsg);
+void gfx_error(Result ret, int line);
+void gfx_displaymessage(char* msg, ...);
+void gfx_waitmessage(char* msg, ...);
 
 #endif

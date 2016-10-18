@@ -20,6 +20,8 @@
 #include "ui.h"
 #include "kb.h"
 #include "actions.h"
+#include "acres.h"
+#include "backup.h"
 #include "menus.h"
 
 #define STACKSIZE (4 * 1024)
@@ -27,10 +29,9 @@
 static int is_loaded = 0;
 static u8* gardenData = NULL;
 static u8* gardenPath = NULL;
-static FILE* gardenFile = NULL;
+static Handle sdmc_file_handle = 0;
 
 static int fontheight = 11;
-//static int fontwidth = 7;
 
 int get_loaded_status(){
 	if(is_loaded == 0)
@@ -40,228 +41,171 @@ int get_loaded_status(){
 }
 
 //load & save
-void load_garden(){
-	struct stat st;
+void load_menu(){
+	int menuindex = 0;
+	int menucount = 3;
+
+	char headerstr[] = "Load/restore options";
+	char* menu_entries[] = {
+		"Load garden.dat from file",
+		"Dump save from game & create backup",
+		"Restore from backup"
+	};
 
 	while(aptMainLoop()){
-		char* origpath,* newpath;
-		origpath = browse_dir("Load garden.dat");
-		stat(origpath, &st);//for size
-		newpath = calloc(strlen(origpath)+1, 1);
-		strcpy(newpath, origpath);
-		if(!strcmp(origpath, "")){
-			return;
-		}
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
 
-		char* token = strtok(newpath, "/");
-		while(token){
-			if(!strcmp(token, "garden.dat") && st.st_size == 522752){
-				sf2d_start_frame(GFX_TOP, GFX_LEFT);
-					ui_frame();
-					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Loading garden.dat... ");
-				sf2d_end_frame();
-				if(is3dsx){
-					sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-					sf2d_end_frame();
-				}
-				sf2d_swapbuffers();
-				gardenFile = fopen(origpath, "rb");
-				gardenPath = (u8*)origpath;
-				if(gardenFile != NULL){
-					//load entire file into memory
-					gardenData = malloc(st.st_size);
-					fread(gardenData, st.st_size, 1, gardenFile);
-					while(aptMainLoop()){
-						hidScanInput();
-
-						if(hidKeysDown() & KEY_A)
-							break;
-
-						sf2d_start_frame(GFX_TOP, GFX_LEFT);
-							ui_frame();
-							sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Loading garden.dat... Done!");
-							sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-						sf2d_end_frame();
-						if(is3dsx){
-							sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-							sf2d_end_frame();
-						}
-						sf2d_swapbuffers();
-					}
-					fclose(gardenFile);
-					gardenFile = NULL;
-					is_loaded = 1;
-				}
-				else{
-					while(aptMainLoop()){
-						hidScanInput();
-
-						if(hidKeysDown() & KEY_A)
-							break;
-
-						sf2d_start_frame(GFX_TOP, GFX_LEFT);
-							ui_frame();
-							sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Loading garden.dat... Failed! errno %d", errno);
-							sftd_draw_textf(font, 0, fontheight*3, COLOR_WHITE, fontheight, "Path: %s", origpath);
-							sftd_draw_text(font, 0, fontheight*5, COLOR_WHITE, fontheight, "Press the A button to continue.");
-						sf2d_end_frame();
-						if(is3dsx){
-							sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-							sf2d_end_frame();
-						}
-						sf2d_swapbuffers();
-					}
-				}
-				fclose(gardenFile);
-				gardenFile = NULL;
-				
-				return;
-			}
-			token = strtok(NULL, "/");
-
-		}
-
-		while(aptMainLoop()){
-			hidScanInput();
-
-			if(hidKeysDown() & KEY_A)
+		if(menuindex == -1)
+			break;
+		
+		switch(menuindex){
+			case 0:
+				load_garden_file();
 				break;
-			
-			sf2d_start_frame(GFX_TOP, GFX_LEFT);
-				ui_frame();
-				sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Loading garden.dat... Invalid file!");
-				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-			sf2d_end_frame();
-			if(is3dsx){
-				sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-				sf2d_end_frame();
-			}
-			sf2d_swapbuffers();
+			case 1:
+				dump_and_backup_garden();
+				break;
+			case 2:
+				restore_backup();
+				break;
 		}
 	}
 }
 
-void save_changes(){
-	int i;
-	int prompt_res;
-	char* path,* filename,* tmpstr;
-	
-	struct stat path_stat;
+void save_menu(){
+	int menuindex = 0;
+	int menucount = 2;
 
-	if(gardenData == NULL){
-			while(aptMainLoop()){
-				hidScanInput();
+	char headerstr[] = "Save/inject options";
+	char* menu_entries[] = {
+		"Inject changes into cartridge",
+		"Save garden.dat to file",
+	};
 
-				if(hidKeysDown() & KEY_A)
-					break;
-				sf2d_start_frame(GFX_TOP, GFX_LEFT);
-					ui_frame();
-					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Please load a file first!");
-					sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-				sf2d_end_frame();
-				if(is3dsx){
-					sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-					sf2d_end_frame();
-				}
-				sf2d_swapbuffers();
+	if(!gardenData){
+		gfx_waitmessage("Please dump or load a file first!");
+		return;
+	}
+
+	while(aptMainLoop()){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+		
+		switch(menuindex){
+			case 0:
+				inject_changes();
+				break;
+			case 1:
+				save_garden_file();
+				break;
+		}
+	}
+}
+
+//load menu
+void load_garden_file(){
+	Result ret;
+	u64 size;
+	u32 read;
+	char* path;
+
+	while(aptMainLoop()){
+		path = browse_dir("Load garden.dat");
+		if(!strcmp(path, "")){
+			return;
+		}
+		ret = FSUSER_OpenFile(&sdmc_file_handle, sdmc_arch, fsMakePath(PATH_ASCII, path), FS_OPEN_WRITE, 0);
+		if(ret){
+			gfx_error(ret, __LINE__);
+			return;
+		}
+		FSFILE_GetSize(sdmc_file_handle, &size);
+
+		if(size == GARDEN_SIZE){
+			gfx_displaymessage("Loading garden.dat...");
+			gardenPath = (u8*)path;
+			//load entire file into memory
+			gardenData = malloc(size);
+			ret = FSFILE_Read(sdmc_file_handle, &read, 0, gardenData, GARDEN_SIZE);
+			if(ret){
+				gfx_error(ret, __LINE__);
+				FSFILE_Close(sdmc_file_handle);
 			}
-		return;
-	}
-
-	prompt_res = gfx_prompt3("Overwrite previous file or select a new one?", "A = Overwrite, Y = Select, B = Cancel");
-	if(prompt_res == 0){
-		path = (char*)gardenPath;
-		goto save_changes_end;
-	}
-	else if(prompt_res == 1){
-		return;
-	}
-	else{
-		path = browse_dir("Save garden.dat");
-		stat(path, &path_stat); //stat path to check to see if it's a file or directory
-		if(S_ISDIR(path_stat.st_mode)){
-			kb_init();
-			filename = draw_kb("Enter a filename");
-			kb_fini();
-			if(filename[0] == '\0') //if user pressed B
-				return;
-			tmpstr = path;
-			path = calloc(strlen(path)+strlen(filename)+1, 1);
-			sprintf(path, "%s%s", tmpstr, filename);
-			goto save_changes_end;
+			gfx_waitmessage("Loading garden.dat... Done!");
+			is_loaded = 1;
+			
+			return;
 		}
 		else{
-			gardenFile = fopen(path, "wb");
-			goto save_changes_end;
+			gfx_waitmessage("Loading garden.dat... Invalid file!");
+			continue;
 		}
 	}
+}
 
-save_changes_end:
-	sf2d_start_frame(GFX_TOP, GFX_LEFT);
-		ui_frame();
-		sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Saving (this might take a while)...");
-	sf2d_end_frame();
-	if(is3dsx){
-		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-		sf2d_end_frame();
-	}
-	sf2d_swapbuffers();
+void dump_and_backup_garden(){
+	gfx_displaymessage("Dumping save into memory...");
+	gardenData = (u8*)game_to_buffer();
+	gfx_displaymessage("Backing up to \"backup\"...");
+	buffer_to_dir((char*)gardenData, "backup");
+	gfx_waitmessage("Dumped save data to memory. Dumped memory to \"Backup\"");
 
-	gardenFile = fopen(path, "wb");
-	if(gardenFile == NULL){
-		while(aptMainLoop()){
-			hidScanInput();
+	is_loaded = 1;
+}
 
-			if(hidKeysDown() & KEY_A)
-				break;
+void restore_backup(){
+	gfx_displaymessage("Restoring backup in \"backup\"...");
+	gardenData = (u8*)dir_to_buffer("backup");
+	buffer_to_game((char*)gardenData);
+	gfx_waitmessage("Restoring backup in \"backup\"... Done!");
+}
 
-			sf2d_start_frame(GFX_TOP, GFX_LEFT);
-				ui_frame();
-				sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Error opening file!");
-				sftd_draw_text(font, 0, fontheight*3, COLOR_WHITE, fontheight, "Press the A key to continue.");
-			sf2d_end_frame();
-			if(is3dsx){
-				sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-				sf2d_end_frame();
-			}
-			sf2d_swapbuffers();
-		}
-		return;
-	}
-	//update checksums so the save file isn't labeled as corrupt
-	updateChecksum(gardenData, 0x80, 0x1c);
-	for(i = 0; i < 4; i++){
-		updateChecksum(gardenData, 0xa0+(SIZE_PLAYER*i), 0x6b64);
-		updateChecksum(gardenData, 0xa0+(SIZE_PLAYER*i)+0x6b68, 0x33a4);
-	}
-	updateChecksum(gardenData, 0x27ce0, 0x218b0);
-	updateChecksum(gardenData, 0x495a0, 0x44b8);
-	updateChecksum(gardenData, 0x4da5c, 0x1e420);
-	updateChecksum(gardenData, 0x6be80, OFFSET_PLAYERS);
-	updateChecksum(gardenData, 0x6bea4, 0x13af8);
-	
-	fwrite(gardenData, 522752, 1, gardenFile);
-	fclose(gardenFile);
+//save menu
+void inject_changes(){
+	gfx_displaymessage("Injecting changes into game...");
+	writeChecksums(gardenData);
+	buffer_to_game((char*)gardenData);
+	gfx_waitmessage("Injecting changes into game... Done!");
+
+	FSFILE_Close(sdmc_file_handle);
 	free(gardenData);
 	gardenData = NULL;
+
+	is_loaded = 0;
+}
+
+void save_garden_file(){
+	Result ret;
+	u32 written;
 	
-	while(aptMainLoop()){
-		hidScanInput();
-
-		if(hidKeysDown() & KEY_A)
-			break;
-
-		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Saving (this might take a while)... Done!");
-			sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-		sf2d_end_frame();
-		if(is3dsx){
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-		}
-		sf2d_swapbuffers();
+	if(sdmc_file_handle == 0){
+		if(gardenData)
+			gfx_waitmessage("Please inject the save instead!");
+		else
+			gfx_waitmessage("Please load a file first!");
+		return;
 	}
+
+	if(gfx_prompt("Overwrite previous file?", NULL))
+		return;
+
+	gfx_displaymessage("Saving (this might take a while)...");
+
+	//update checksums so the save file isn't labeled as corrupt
+	writeChecksums(gardenData);
+	
+	ret = FSFILE_Write(sdmc_file_handle, &written, 0, gardenData, GARDEN_SIZE, FS_WRITE_FLUSH);
+	if(ret)
+		gfx_error(ret, __LINE__);
+	ret = FSFILE_Close(sdmc_file_handle);
+	if(ret)
+		gfx_error(ret, __LINE__);
+	free(gardenData);
+	gardenData = NULL;
+
+	gfx_waitmessage("Saving (this might take a while)... Done!");
 	is_loaded = 0;
 }
 
@@ -317,7 +261,7 @@ void map_menu(){
 				water_flowers();
 				break;
 			case 3:
-				map_tile_editor();
+				//map_tile_editor();
 				break;
 		}
 	}
@@ -591,6 +535,48 @@ void water_flowers(){
 
 void map_tile_editor(){
 	//TODO
+	int i, j;
+	u8 acres[7*6];
+
+	//get acre bytes into acres
+	j = 0;
+	for(i = 0; i < 7*6*2; i++){
+		if(i == 7*6*2-1){
+			acres[j] = readByte1(gardenData, OFFSET_MAP_ACRES+i-1);
+			j++;
+		}
+		else if(i % 2 == 0){
+			acres[j] = readByte1(gardenData, OFFSET_MAP_ACRES+i-2);
+			j++;
+		}
+	}
+
+	while(aptMainLoop()){
+		hidScanInput();
+
+		if(hidKeysDown() & KEY_A)
+			break;
+
+		sf2d_start_frame(GFX_TOP, GFX_LEFT);
+			ui_frame();
+			sf2d_draw_rectangle(88-3, 36-3, 223+6, 179+6, COLOR_BLACK);
+			sf2d_draw_rectangle(88, 36, 223, 179, RGBA8(0x77, 0x77, 0x77, 0xFF));
+			for(i = 0; i < 6; i++){
+				for(j = 0; j < 7; j++){
+					if(i == 0)
+						sf2d_draw_texture_scale(acre_textures[acres[(i*7)+(j+1)]], 88+j*32, 36, 0.49, 0.49);
+					else
+						sf2d_draw_texture_scale(acre_textures[acres[(i*7)+(j+1)]], 88+j*32, 24+i*32, 0.49, 0.49);
+					sf2d_draw_rectangle(88+32, 36+20, 31, 31, RGBA8(0x00, 0x00, 0xFF, 0x03));
+				}
+			}
+		sf2d_end_frame();
+		if(is3dsx){
+			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_end_frame();
+		}
+		sf2d_swapbuffers();
+	}
 }
 
 
@@ -1198,8 +1184,8 @@ void villager_menu(int villager){
 	char headerstr[] = "Select an option";
 	char* menu_entries[] = {
 		"Toggle whether boxed",
-		"Reset villager to default settings",
-		"Set villager"
+		"Reset villager to defaults (not yet working!)",
+		"Set villager (not yet working!)"
 	};
 
 	while(aptMainLoop()){

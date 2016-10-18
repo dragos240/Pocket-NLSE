@@ -20,7 +20,7 @@
 - Villager options
  - Toggle whether villager is boxed (Working as of this commit!)
  - Reset villager (Not yet working!)
- - Change villager (Not yet working!)
+ - Set villager (Not yet working!)
 - Misc options
   - Unlock all PWPs
 

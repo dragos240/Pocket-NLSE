@@ -1,10 +1,20 @@
 #ifndef NLSE_MENUS_H
 #define NLSE_MENUS_H
 
-//load & save
 int get_loaded_status();
-void load_garden();
-void save_changes();
+
+//load & save
+void load_menu();
+void save_menu();
+
+//load menu
+void load_garden_file();
+void dump_and_backup_garden();
+void restore_backup();
+
+//save menu
+void inject_changes();
+void save_garden_file();
 
 //main menu
 void map_menu();

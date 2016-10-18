@@ -6,6 +6,7 @@
 
 #include <3ds.h>
 
+#include "common.h"
 #include "actions.h"
 #include "menu.h"
 
@@ -167,4 +168,19 @@ void updateChecksum(u8* data, u32 offset, u32 length){
 
 
 	data_offset = 0x80;
+}
+
+void writeChecksums(u8* data){
+	int i;
+
+	updateChecksum(data, 0x80, 0x1c);
+	for(i = 0; i < 4; i++){
+		updateChecksum(data, 0xa0+(SIZE_PLAYER*i), 0x6b64);
+		updateChecksum(data, 0xa0+(SIZE_PLAYER*i)+0x6b68, 0x33a4);
+	}
+	updateChecksum(data, 0x27ce0, 0x218b0);
+	updateChecksum(data, 0x495a0, 0x44b8);
+	updateChecksum(data, 0x4da5c, 0x1e420);
+	updateChecksum(data, 0x6be80, OFFSET_PLAYERS);
+	updateChecksum(data, 0x6bea4, 0x13af8);
 }
