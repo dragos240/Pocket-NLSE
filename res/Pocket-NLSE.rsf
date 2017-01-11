@@ -37,6 +37,7 @@ AccessControlInfo:
   FileSystemAccess:
    #- CategorySystemApplication
    #- CategoryHardwareCheck
+<<<<<<< HEAD
    - CategoryFileSystemTool
    #- Debug
    #- TwlCardBackup
@@ -46,13 +47,28 @@ AccessControlInfo:
    #- Core
    #- CtrNandRo
    - CtrNandRw
+=======
+   #- CategoryFileSystemTool
+   #- Debug
+   #- TwlCardBackup
+   #- TwlNandData
+   #- Boss
+   - DirectSdmc
+   #- Core
+   #- CtrNandRo
+   #- CtrNandRw
+>>>>>>> d047911a8b69559d35e165769bd87be7be16361c
    #- CtrNandRoWrite
    #- CategorySystemSettings
    #- CardBoard
    #- ExportImportIvs
    #- DirectSdmcWrite
    #- SwitchCleanup
+<<<<<<< HEAD
    - SaveDataMove
+=======
+   #- SaveDataMove
+>>>>>>> d047911a8b69559d35e165769bd87be7be16361c
    #- Shop
    #- Shell
    #- CategoryHomeMenu
@@ -178,9 +194,15 @@ AccessControlInfo:
 
 
 SystemControlInfo:
+<<<<<<< HEAD
   SaveDataSize: 0KB
   RemasterVersion: $(VERSION)
   StackSize: 0x40000
+=======
+  SaveDataSize: 0K
+  RemasterVersion: 0
+  StackSize: 0x4000
+>>>>>>> d047911a8b69559d35e165769bd87be7be16361c
 
   # Modules that run services listed above should be included below
   # Maximum 48 dependencies

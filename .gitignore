@@ -8,7 +8,10 @@
 /*.png
 *.cia
 *.swp
+<<<<<<< HEAD
 *.dmp
+=======
+>>>>>>> d047911a8b69559d35e165769bd87be7be16361c
 !logo.png
 *.xcf
 *.sh
@@ -18,6 +21,9 @@ build/
 oldsource/
 /test*
 ideas/
+<<<<<<< HEAD
 /Pocket-NLSE-stable/
 Store.mp3
 unifont.ttf
+=======
+>>>>>>> d047911a8b69559d35e165769bd87be7be16361c
