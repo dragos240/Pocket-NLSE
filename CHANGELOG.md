@@ -1,6 +1,5 @@
 # Change Log
 
-<<<<<<< HEAD
 ## Latest - 2016-10-03
 ### Added
 - This changelog!
@@ -28,17 +27,6 @@
 ### Changed
 - Makefile now generates .cia files
 - Pocket-NLSE now warns users that if they change their player's, their villagers will forget them
-=======
-## Latest
-### Added
-- This changelog!
-- res folder containing files needed to build the CIA
-
-### Changed
-- Makefile now generates .cia files
-- icon.png (looks like a pocket now)
-- banner icon.png (text is now a dark green instead of pure black)
->>>>>>> d047911a8b69559d35e165769bd87be7be16361c
 
 ## [v0.1.0 (initial pre-release)](https://github.com/dragos240/Pocket-NLSE/releases/tag/v0.1.0-pre-alpha) - 2016-09-30
 ### Added

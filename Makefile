@@ -27,7 +27,7 @@ include $(DEVKITARM)/3ds_rules
 #     - icon.png
 #     - <libctru folder>/default_icon.png
 #---------------------------------------------------------------------------------
-TARGET		:=	Pocket-NLSE
+TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
 SOURCES		:=	source
 DATA		:=	data
@@ -152,17 +152,12 @@ $(BUILD):
 #---------------------------------------------------------------------------------
 clean:
 	echo clean ...
-<<<<<<< HEAD
 	rm -rf $(BUILD) $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).elf $(TARGET).cia *.zip Pocket-NLSE-*
-=======
-	rm -rf $(BUILD) $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).elf $(TARGET).cia
->>>>>>> d047911a8b69559d35e165769bd87be7be16361c
 
 citra:
 	citra-qt $(TARGET).3dsx
 
 cia:
-<<<<<<< HEAD
 	@bannertool makebanner -i res/banner\ icon.png -a res/audio.wav -o banner.bnr
 	@bannertool makesmdh -s "Pocket-NLSE" -l "Pocket-NLSE" -p "Dragos240" -i icon.png -o icon.icn
 	@makerom -f cia -o Pocket-NLSE.cia -rsf res/Pocket-NLSE.rsf -target t -exefslogo -elf Pocket-NLSE.elf \
@@ -174,13 +169,6 @@ zip:
 	mkdir Pocket-NLSE
 	cp $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).cia $(TARGET).xml Pocket-NLSE/
 	zip -r Pocket-NLSE-latest.zip Pocket-NLSE/
-=======
-	#bannertool makebanner -i res/banner\ icon.png -a res/nltheme.wav -o banner.bnr
-	bannertool makebanner -i res/banner\ icon.png -a res/audio.wav -o banner.bnr
-	bannertool makesmdh -s "Pocket-NLSE" -l "Pocket-NLSE" -p "Dragos240" -i icon.png -o icon.icn
-	makerom -f cia -o Pocket-NLSE.cia -rsf res/Pocket-NLSE.rsf -target t -exefslogo -elf Pocket-NLSE.elf -icon icon.icn -banner banner.bnr
-	rm -f banner.bnr icon.icn
->>>>>>> d047911a8b69559d35e165769bd87be7be16361c
 
 #---------------------------------------------------------------------------------
 else
