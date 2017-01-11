@@ -1,16 +1,10 @@
-#ifndef NLSE_BACKUP_H
-#define NLSE_BACKUP_H
+#ifndef TM_BACKUP_H
+#define TM_BACKUP_H
 
-extern FS_Archive game_arch;
-extern FS_Archive sdmc_arch;
+u64 filesize_to_u64(FS_Archive arch, char* filepath);
+int buffer_to_file(FS_Archive arch, char* buffer, u64 size, char* dirpath, char* filename);
+char* file_to_buffer(FS_Archive arch, char* dirpath, char* filename);
 
-Result backup_init();
-Result backup_fini();
-
-char* game_to_buffer(); //game -> buffer
-void buffer_to_game(char* buffer); //buffer -> game
-
-void buffer_to_dir(char* buffer, char* dirname); //buffer -> dir
-char* dir_to_buffer(char* dirname); //dir -> buffer
+void backup_to_prev_folder(char* dirname);
 
 #endif

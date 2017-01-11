@@ -1,5 +1,6 @@
 //Pocket-NLSE
 //Special thanks to qlutoo, yellows8 (for advice and much of the menu functionality), and profi200
+#include <stdio.h>
 
 #include <3ds.h>
 #include <sf2d.h>
@@ -7,22 +8,21 @@
 #include <sfil.h>
 
 #include "common.h"
-#include "log.h"
 #include "gfx.h"
 #include "menu.h"
 #include "dir.h"
 #include "ui.h"
 #include "kb.h"
 #include "dir.h"
+#include "actions.h"
 #include "menus.h"
+#include "fs.h"
 #include "backup.h"
 #include "tests.h"
 
-//static const u32 second = 1000000000;
-
 u8* gardenData = NULL;
+bool items_initialized = false;
 
-static u32 fontheight = 11;
 u32 debug = 0; //1 = Run tests
 bool devmode = false;
 
@@ -40,50 +40,65 @@ int main(){
 		devmode = true;
 
 	int is_loaded = 0;
+	bool opened = false;
 
 	int menuindex=0;
 	int menucount;
 
 	char headerstr[1024];
+	char* version = "v1.0.0";
 
 	char* menu_entries[] = {
-		"Load/restore options (do this first!)",
+		"Load/restore (do this first!)",
 		"Map options",
 		"Player options",
 		"Villager options",
 		"Misc options",
-		"Save/inject options (do this last!)",
-		"List test",
-		"View APT ID"
+		"Inject changes (do this last!)",
+		"List test"
 	};
 
 	gfx_init();
-	ret = backup_init();
-	if(ret){
-		gfx_error(ret, __LINE__);
+	if(is3dsx){
+		ret = fs_init();
+		if(ret)
+			gfx_error(ret, __FILENAME__, __LINE__);
 	}
+	if(get_mediatype())
+		goto main_cleanup;
+	if(get_titleid() == -1)
+		goto main_cleanup;
+	if((ret = open_archives())){
+		gfx_error(ret, __FILENAME__, __LINE__);
+		goto main_cleanup;
+	}
+	opened = true;
 
+	memset(headerstr, 0, sizeof(headerstr));
+	snprintf(headerstr, sizeof(headerstr)-1, "Pocket NLSE - %s", version);
 	while(aptMainLoop()){
-menus_test_loop_start:
 		if(devmode == true)
 			menucount = 8;
 		else
 			menucount = 6;
 
-		memset(headerstr, 0, sizeof(headerstr));
-		snprintf(headerstr, sizeof(headerstr)-1, "Pocket NLSE");
+		if(is_loaded == 1 && items_initialized == false){
+			items_init(gardenData);
+			items_initialized = true;
+		}
+
 		display_menu(menu_entries, menucount, &menuindex, headerstr);
 
 		if(menuindex == -1){
 			if(!is_loaded)
 				break;
 			else{
-				if(gfx_prompt("Your changes have not been saved. Are you sure you want\nto quit?", NULL)){
+				if(gfx_prompt("Your changes have not been saved. Are you sure you want to quit?", NULL)){
 					menuindex = 0;
-					goto menus_test_loop_start;
+					continue;
 				}
 				else
-					goto menus_test_exit;
+					goto main_cleanup;
 			}
 		}
 
@@ -106,41 +121,23 @@ menus_test_loop_start:
 				misc_menu();
 				break;
 			case 5:
-				save_menu();
+				inject_changes();
 				if(get_loaded_status() == 0)
 					is_loaded = 0;
 				break;
 			case 6:
 				list_test();
 				break;
-			case 7:
-				view_apt_id();
-				break;
 		}
 	}
 
-menus_test_exit:
-
-	while(aptMainLoop()){
-		hidScanInput();
-
-		if(hidKeysDown() & KEY_START)
-			break;
-
-		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Press the START button to exit.");
-		sf2d_end_frame();
-		if(is3dsx){
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-		}
-		sf2d_swapbuffers();
+main_cleanup:
+	if(opened)
+		if((ret = close_archives()))
+			gfx_error(ret, __FILENAME__, __LINE__);
+	if(is3dsx){
+		fs_fini();
 	}
-
-	ret = backup_fini();
-	if(ret)
-		gfx_error(ret, __LINE__);
 	gfx_fini();
 
 	return 0;

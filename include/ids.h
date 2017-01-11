@@ -4,13 +4,19 @@
 #include <3ds.h>
 
 typedef struct{
-	int id;
-	int type; //personality
 	char name[10];
-	char catchphrase[15];
-	u32 data[25];
+	u16 type; //personality
+	u8 catchphrase[15];
+	u32 data[22];
 } villager_t;
 
-extern villager_t villagers[333];
+typedef struct{
+	u8 r; //red
+	u8 g; //green
+	u8 b; //blue
+} color_t;
+
+extern villager_t villagers[399];
+extern color_t colors[19];
 
 #endif

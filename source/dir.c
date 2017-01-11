@@ -42,7 +42,7 @@ char* browse_dir(char* headerstr){
 		//get size of all files/folders
 		while((ent = readdir(dir)) != NULL){
 			sf2d_start_frame(GFX_TOP, GFX_LEFT);
-				ui_frame();
+				ui_frame("Loading...");
 				sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Calculating number of files/dirs...");
 			sf2d_end_frame();
 			if(is3dsx){

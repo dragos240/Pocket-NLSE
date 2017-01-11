@@ -6,7 +6,6 @@
 #include <sfil.h>
 
 #include "common.h"
-#include "log.h"
 #include "gfx.h"
 #include "menu.h"
 #include "dir.h"
@@ -14,15 +13,14 @@
 #include "kb.h"
 #include "dir.h"
 #include "menus.h"
+#include "fs.h"
 #include "backup.h"
 #include "tests.h"
 
 static int fontheight = 11;
-//static int fontwidth = 7;
 
 void run_tests(){
 	backup_test();
-	//utf_8_test();
 	//mintest();
 	//menu_test();
 	//ui_test();
@@ -34,38 +32,23 @@ void backup_test(){
 	Result ret;
 
 	gfx_init();
+	get_mediatype();
+	if(get_titleid() == -1)
+		goto backup_test_cleanup;
 
 	gfx_displaymessage("Backing up cartridge...");
 
-	ret = backup_init();
-	if(ret){
-		gfx_error(ret, __LINE__);
-	}
+	if((ret = fs_init()))
+		gfx_error(ret, __FILENAME__, __LINE__);
+	if((ret = open_archives()))
+		gfx_error(ret, __FILENAME__, __LINE__);
 
-	//backup_to_dir("backup");
-	//restore_from_dir("backup");
-
-	backup_fini();
+backup_test_cleanup:
+	fs_fini();
+	if((ret = close_archives()))
+		gfx_error(ret, __FILENAME__, __LINE__);
 
 	gfx_waitmessage("Done! (hopefully)");
-
-	gfx_fini();
-}
-
-void utf_8_test(){
-	gfx_init();
-
-	sf2d_start_frame(GFX_TOP, GFX_LEFT);
-		sftd_draw_textf(unifont, 0, 0, COLOR_WHITE, fontheight, u8"それはテスト。");
-	sf2d_end_frame();
-	sf2d_swapbuffers();
-
-	while(aptMainLoop()){
-		hidScanInput();
-
-		if(hidKeysDown() & KEY_A)
-			break;
-	}
 
 	gfx_fini();
 }
@@ -83,9 +66,7 @@ void dir_test(){
 			break;
 
 		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-		ui_frame();
-		sftd_draw_textf(font_bold, 1, 1, COLOR_BLACK, fontheight, "Path: %s", path);
-		sftd_draw_textf(font_bold, 0, 0, COLOR_WHITE, fontheight, "Path: %s", path);
+		ui_frame("Path: %s", path);
 
 		sftd_draw_textf(font, 0, 2*fontheight, COLOR_WHITE, fontheight, "Press the A button to continue.\n");
 		sf2d_end_frame();
@@ -102,9 +83,7 @@ void dir_test(){
 void kb_test(){
 	gfx_init();
 
-	kb_init();
-	char* str = draw_kb(NULL);
-	kb_fini();
+	char* str = get_string("Type in some text");
 
 	while(aptMainLoop()){
 		hidScanInput();
@@ -113,9 +92,7 @@ void kb_test(){
 			break;
 
 		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			sftd_draw_text(font_bold, 1, 1, COLOR_BLACK, fontheight, "Keyboard test");
-			sftd_draw_text(font_bold, 0, 0, COLOR_WHITE, fontheight, "Keyboard test");
+			ui_frame("Keyboard test");
 			sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "You entered: %s", str);
 			sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
 		sf2d_end_frame();
@@ -139,7 +116,7 @@ void ui_test(){
 			break;
 
 		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
+			ui_frame("UI test");
 		sf2d_end_frame();
 		if(is3dsx){
 			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
@@ -174,9 +151,7 @@ void menu_test(){
 			break;
 
 		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-		ui_frame();
-		sftd_draw_textf(font_bold, 1, 1, COLOR_BLACK, fontheight, "You selected #%d\n", menupos+1);
-		sftd_draw_textf(font_bold, 0, 0, COLOR_WHITE, fontheight, "You selected #%d\n", menupos+1);
+		ui_frame("You selected #%d\n", menupos+1);
 
 		sftd_draw_textf(font, 0, 2*fontheight, COLOR_WHITE, fontheight, "Press the A button to continue.\n");
 		sf2d_end_frame();

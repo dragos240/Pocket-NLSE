@@ -13,7 +13,6 @@
 #include "constants.h"
 #include "common.h"
 #include "ids.h"
-#include "log.h"
 #include "gfx.h"
 #include "menu.h"
 #include "dir.h"
@@ -21,13 +20,11 @@
 #include "kb.h"
 #include "actions.h"
 #include "acres.h"
+#include "fs.h"
 #include "backup.h"
 #include "menus.h"
 
-#define STACKSIZE (4 * 1024)
-
 static int is_loaded = 0;
-static u8* gardenData = NULL;
 static u8* gardenPath = NULL;
 static Handle sdmc_file_handle = 0;
 
@@ -43,12 +40,11 @@ int get_loaded_status(){
 //load & save
 void load_menu(){
 	int menuindex = 0;
-	int menucount = 3;
+	int menucount = 2;
 
 	char headerstr[] = "Load/restore options";
 	char* menu_entries[] = {
-		"Load garden.dat from file",
-		"Dump save from game & create backup",
+		"Dump save & create backup",
 		"Restore from backup"
 	};
 
@@ -60,12 +56,9 @@ void load_menu(){
 		
 		switch(menuindex){
 			case 0:
-				load_garden_file();
-				break;
-			case 1:
 				dump_and_backup_garden();
 				break;
-			case 2:
+			case 1:
 				restore_backup();
 				break;
 		}
@@ -78,8 +71,8 @@ void save_menu(){
 
 	char headerstr[] = "Save/inject options";
 	char* menu_entries[] = {
-		"Inject changes into cartridge",
-		"Save garden.dat to file",
+		"Inject changes into game",
+		"Save garden_plus.dat to file",
 	};
 
 	if(!gardenData){
@@ -112,61 +105,76 @@ void load_garden_file(){
 	char* path;
 
 	while(aptMainLoop()){
-		path = browse_dir("Load garden.dat");
+		path = browse_dir("Load garden_plus.dat");
 		if(!strcmp(path, "")){
 			return;
 		}
 		ret = FSUSER_OpenFile(&sdmc_file_handle, sdmc_arch, fsMakePath(PATH_ASCII, path), FS_OPEN_WRITE, 0);
 		if(ret){
-			gfx_error(ret, __LINE__);
+			gfx_error(ret, __FILENAME__, __LINE__);
 			return;
 		}
 		FSFILE_GetSize(sdmc_file_handle, &size);
 
-		if(size == GARDEN_SIZE){
-			gfx_displaymessage("Loading garden.dat...");
+		if(size == SIZE_GARDEN){
+			gfx_displaymessage("Loading garden_plus.dat...");
 			gardenPath = (u8*)path;
 			//load entire file into memory
 			gardenData = malloc(size);
-			ret = FSFILE_Read(sdmc_file_handle, &read, 0, gardenData, GARDEN_SIZE);
+			ret = FSFILE_Read(sdmc_file_handle, &read, 0, gardenData, SIZE_GARDEN);
 			if(ret){
-				gfx_error(ret, __LINE__);
+				gfx_error(ret, __FILENAME__, __LINE__);
 				FSFILE_Close(sdmc_file_handle);
 			}
-			gfx_waitmessage("Loading garden.dat... Done!");
+			gfx_waitmessage("Loading garden_plus.dat... Done!");
 			is_loaded = 1;
 			
 			return;
 		}
 		else{
-			gfx_waitmessage("Loading garden.dat... Invalid file!");
+			gfx_waitmessage("Loading garden_plus.dat... Invalid file!");
 			continue;
 		}
 	}
 }
 
 void dump_and_backup_garden(){
+	u64 size;
+
 	gfx_displaymessage("Dumping save into memory...");
-	gardenData = (u8*)game_to_buffer();
+		gardenData = (u8*)file_to_buffer(game_arch, "/", "garden_plus.dat");
 	gfx_displaymessage("Backing up to \"backup\"...");
-	buffer_to_dir((char*)gardenData, "backup");
-	gfx_waitmessage("Dumped save data to memory. Dumped memory to \"Backup\"");
+		size = filesize_to_u64(game_arch, "/garden_plus.dat");
+		FSUSER_CreateDirectory(sdmc_arch, fsMakePath(PATH_ASCII, "/Pocket-NLSE/Saves/backup"), 0);
+		buffer_to_file(sdmc_arch, (char*)gardenData, size, "/Pocket-NLSE/Saves/backup/", "garden_plus.dat");
+	gfx_waitmessage("Dumped save data to memory. Dumped memory to \"backup\"");
 
 	is_loaded = 1;
 }
 
 void restore_backup(){
-	gfx_displaymessage("Restoring backup in \"backup\"...");
-	gardenData = (u8*)dir_to_buffer("backup");
-	buffer_to_game((char*)gardenData);
-	gfx_waitmessage("Restoring backup in \"backup\"... Done!");
+	u64 size;
+
+	gfx_displaymessage("Restoring backup from \"backup\"...");
+		gardenData = (u8*)file_to_buffer(sdmc_arch, "/Pocket-NLSE/Saves/backup/", "garden_plus.dat");
+		size = filesize_to_u64(sdmc_arch, "/Pocket-NLSE/Saves/backup/garden_plus.dat");
+		buffer_to_file(game_arch, (char*)gardenData, size, "/", "garden_plus.dat");
+	gfx_waitmessage("Restoring backup from \"backup\"... Done!");
 }
 
 //save menu
 void inject_changes(){
+	u64 size;
+	
+	if(!gardenData){
+		gfx_waitmessage("Please dump your save first!");
+		return;
+	}
+
 	gfx_displaymessage("Injecting changes into game...");
 	writeChecksums(gardenData);
-	buffer_to_game((char*)gardenData);
+	size = filesize_to_u64(sdmc_arch, "/Pocket-NLSE/Saves/backup/garden_plus.dat");
+	buffer_to_file(game_arch, (char*)gardenData, size, "/", "garden_plus.dat");
 	gfx_waitmessage("Injecting changes into game... Done!");
 
 	FSFILE_Close(sdmc_file_handle);
@@ -191,21 +199,21 @@ void save_garden_file(){
 	if(gfx_prompt("Overwrite previous file?", NULL))
 		return;
 
-	gfx_displaymessage("Saving (this might take a while)...");
+	gfx_displaymessage("Saving...");
 
 	//update checksums so the save file isn't labeled as corrupt
 	writeChecksums(gardenData);
 	
-	ret = FSFILE_Write(sdmc_file_handle, &written, 0, gardenData, GARDEN_SIZE, FS_WRITE_FLUSH);
+	ret = FSFILE_Write(sdmc_file_handle, &written, 0, gardenData, SIZE_GARDEN, FS_WRITE_FLUSH);
 	if(ret)
-		gfx_error(ret, __LINE__);
+		gfx_error(ret, __FILENAME__, __LINE__);
 	ret = FSFILE_Close(sdmc_file_handle);
 	if(ret)
-		gfx_error(ret, __LINE__);
+		gfx_error(ret, __FILENAME__, __LINE__);
 	free(gardenData);
 	gardenData = NULL;
 
-	gfx_waitmessage("Saving (this might take a while)... Done!");
+	gfx_waitmessage("Saving... Done!");
 	is_loaded = 0;
 }
 
@@ -213,34 +221,18 @@ void save_garden_file(){
 
 void map_menu(){
 	int menuindex = 0;
-	int menucount = 4;
+	int menucount = 2;
 
 	char headerstr[] = "Map options";
 	char* menu_entries[] = {
 		"Grass options",
-		"Unbury fossils (not yet working!)",
+		"Unbury fossils",
 		"Water flowers (not yet working!)",
 		"Map tile editor (not yet working!)"
 	};
 	
 	if(gardenData == NULL){
-			while(aptMainLoop()){
-				hidScanInput();
-
-				if(hidKeysDown() & KEY_A)
-					break;
-				
-				sf2d_start_frame(GFX_TOP, GFX_LEFT);
-					ui_frame();
-					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Please load a file first!");
-					sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-				sf2d_end_frame();
-				if(is3dsx){
-					sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-					sf2d_end_frame();
-				}
-				sf2d_swapbuffers();
-			}
+		gfx_waitmessage("Please load a file first!");
 		return;
 	}
 
@@ -261,7 +253,7 @@ void map_menu(){
 				water_flowers();
 				break;
 			case 3:
-				//map_tile_editor();
+				map_tile_editor();
 				break;
 		}
 	}
@@ -277,31 +269,15 @@ void player_select(){
 	char* menu_entries[4];
 	
 	if(gardenData == NULL){
-			while(aptMainLoop()){
-				hidScanInput();
-
-				if(hidKeysDown() & KEY_A)
-					break;
-				
-				sf2d_start_frame(GFX_TOP, GFX_LEFT);
-					ui_frame();
-					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Please load a file first!");
-					sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-				sf2d_end_frame();
-				if(is3dsx){
-					sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-					sf2d_end_frame();
-				}
-				sf2d_swapbuffers();
-			}
+		gfx_waitmessage("Please load a file first!");
 		return;
 	}
 
 	for(i = 0; i < 4; i++){
 		menu_entries[i] = calloc(11, 1);
 		player_offset = (OFFSET_PLAYERS+SIZE_PLAYER*i);
-		menu_entries[i] = (char*)get_ustring(gardenData, player_offset+0x55a8, 10);
-		if(get_ustring(gardenData, (OFFSET_PLAYERS+SIZE_PLAYER*(i+1))+0x55a8, 1)[0] == '\0')
+		menu_entries[i] = (char*)get_ustring(gardenData, player_offset+OFFSET_PLAYER_NAME, 10);
+		if(get_ustring(gardenData, (OFFSET_PLAYERS+SIZE_PLAYER*(i+1))+OFFSET_PLAYER_NAME, 1)[0] == '\0')
 			break;
 	}
 	menucount = i+1;
@@ -322,9 +298,9 @@ void player_select(){
 }
 
 void villager_select(){
-	int i, j;
+	int i;
 	int villager_offset;
-	u16 id; //villager ID
+	u16 id[10]; //villager ID
 	u32 status;
 	bool is_boxed[10];
 	int menuindex = 0;
@@ -334,34 +310,20 @@ void villager_select(){
 	char* menu_entries[10]; //max of 10 villagers per town
 	
 	if(gardenData == NULL){
-			while(aptMainLoop()){
-				hidScanInput();
-
-				if(hidKeysDown() & KEY_A)
-					break;
-				
-				sf2d_start_frame(GFX_TOP, GFX_LEFT);
-					ui_frame();
-					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Please load a file first!");
-					sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-				sf2d_end_frame();
-				if(is3dsx){
-					sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-					sf2d_end_frame();
-				}
-				sf2d_swapbuffers();
-			}
+		gfx_waitmessage("Please load a file first!");
 		return;
 	}
 
 	while(aptMainLoop()){
 		for(i = 0; i < 10; i++){
 			villager_offset = OFFSET_VILLAGERS+SIZE_VILLAGER*i;
-			id = readByte2(gardenData, villager_offset);
+			id[i] = readByte2(gardenData, villager_offset);
 			status = readByte4(gardenData, villager_offset+OFFSET_VILLAGER_STATUS);
-			if(id > 0x14c || id == 0xffff){
-				if(id == 0xffff)
+			if(id[i] == 0xffff || id[i] > 398){
+				if(id[i] == 0xffff){
 					menu_entries[i] = "(Empty slot!)";
+					menucount = i+1;
+				}
 				else{
 					menucount = i+1;
 					break;
@@ -372,19 +334,16 @@ void villager_select(){
 			else
 				is_boxed[i] = false;
 
-			if(id < 0x14c && i == 9)
+			if(id[i] < 398 && i == 9)
 				menucount = i+1;
 
-			for(j = 0; j < 333; j++){
-				if(id == villagers[j].id){
-					if(is_boxed[i]){
-						menu_entries[i] = calloc(strlen(villagers[j].name)+9, 1);
-						strcat(menu_entries[i], villagers[j].name);
-						strcat(menu_entries[i], " (boxed)");
-					}
-					else
-						menu_entries[i] = villagers[j].name;
-				}
+			if(is_boxed[i]){
+				menu_entries[i] = calloc(strlen(villagers[id[i]].name)+8+1, 1); //" (boxed)" = 8
+				strcat(menu_entries[i], villagers[id[i]].name);
+				strcat(menu_entries[i], " (boxed)");
+			}
+			else if(id[i] != 0xffff){
+				menu_entries[i] = villagers[id[i]].name;
 			}
 		}
 
@@ -392,13 +351,16 @@ void villager_select(){
 
 		if(menuindex == -1)
 			break;
-		
-		villager_menu(menuindex);
+		if(id[menuindex] != 0xffff)
+			villager_menu(menuindex);
+		else
+			gfx_waitmessage("Error! Can't select empty slot right now!");
 	}
 
 	for(i = 0; i < 10; i++){
-		if(is_boxed[i])
+		if(is_boxed[i]){
 			free(menu_entries[i]);
+		}
 	}
 }
 
@@ -412,23 +374,7 @@ void misc_menu(){
 	};
 	
 	if(gardenData == NULL){
-			while(aptMainLoop()){
-				hidScanInput();
-
-				if(hidKeysDown() & KEY_A)
-					break;
-				
-				sf2d_start_frame(GFX_TOP, GFX_LEFT);
-					ui_frame();
-					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Please load a file first!");
-					sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-				sf2d_end_frame();
-				if(is3dsx){
-					sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-					sf2d_end_frame();
-				}
-				sf2d_swapbuffers();
-			}
+		gfx_waitmessage("Please load a file first!");
 		return;
 	}
 
@@ -459,23 +405,7 @@ void grass_menu(){
 	};
 	
 	if(gardenData == NULL){
-			while(aptMainLoop()){
-				hidScanInput();
-
-				if(hidKeysDown() & KEY_A)
-					break;
-				
-				sf2d_start_frame(GFX_TOP, GFX_LEFT);
-					ui_frame();
-					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Please load a file first!");
-					sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-				sf2d_end_frame();
-				if(is3dsx){
-					sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-					sf2d_end_frame();
-				}
-				sf2d_swapbuffers();
-			}
+		gfx_waitmessage("Please load a file first!");
 		return;
 	}
 
@@ -485,48 +415,34 @@ void grass_menu(){
 		if(menuindex == -1)
 			break;
 
-		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			if(menuindex == 0)
-				sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Reviving grass...");
-			else
-				sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Stripping grass...");
-		sf2d_end_frame();
-		if(is3dsx){
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-		}
-		sf2d_swapbuffers();
+		if(menuindex == 0)
+			gfx_displaymessage("Reviving grass...");
+		else
+			gfx_displaymessage("Stripping grass...");
 		if(menuindex == 0)
 			set_grass(gardenData, 0xFF);
 		else
 			set_grass(gardenData, 0x00);
 		
-		while(aptMainLoop()){
-			hidScanInput();
-
-			if(hidKeysDown() & KEY_A)
-				break;
-			
-			sf2d_start_frame(GFX_TOP, GFX_LEFT);
-				ui_frame();
-				if(menuindex == 0)
-					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Reviving grass... Done!");
-				else
-					sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Stripping grass... Done!");
-				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-			sf2d_end_frame();
-			if(is3dsx){
-				sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-				sf2d_end_frame();
-			}
-			sf2d_swapbuffers();
-		}
+		if(menuindex == 0)
+			gfx_waitmessage("Reviving grass... Done!");
+		else
+			gfx_waitmessage("Stripping grass... Done!");
 	}
 }
 
 void unbury_fossils(){
-	//TODO
+	int i;
+	int numfossils = 0;
+
+	gfx_displaymessage("Finding buried fossils...");
+	for(i = 0; i < SIZE_MAP_ITEMS; i++){
+		if(map_items[i].itemid == 0x202a && map_items[i].flag2 == 0x80){
+			numfossils++;
+			storeByte(gardenData, OFFSET_MAP_ITEMS+i*4+3, 0x00);
+		}
+	}
+	gfx_waitmessage("%d fossils unburied!", numfossils);
 }
 
 void water_flowers(){
@@ -537,6 +453,12 @@ void map_tile_editor(){
 	//TODO
 	int i, j;
 	u8 acres[7*6];
+	u8 current_acre;
+	u8 acre_cur_x = 0;
+	u8 acre_cur_y = 0;
+
+	u8 tile_cur_x = 0;
+	u8 tile_cur_y = 0;
 
 	//get acre bytes into acres
 	j = 0;
@@ -554,27 +476,58 @@ void map_tile_editor(){
 	while(aptMainLoop()){
 		hidScanInput();
 
-		if(hidKeysDown() & KEY_A)
+		if(hidKeysDown() & KEY_B)
 			break;
+		else if(hidKeysHeld() & KEY_UP && acre_cur_y > 0){
+			acre_cur_y--;
+			svcSleepThread(0.25*SECOND_IN_NS);
+		}
+		else if(hidKeysHeld() & KEY_RIGHT && acre_cur_x < 6){
+			acre_cur_x++;
+			svcSleepThread(0.25*SECOND_IN_NS);
+		}
+		else if(hidKeysHeld() & KEY_DOWN && acre_cur_y < 5){
+			acre_cur_y++;
+			svcSleepThread(0.25*SECOND_IN_NS);
+		}
+		else if(hidKeysHeld() & KEY_LEFT && acre_cur_x > 0){
+			acre_cur_x--;
+			svcSleepThread(0.25*SECOND_IN_NS);
+		}
 
+		//top screen (acres)
 		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
+			ui_frame("Use dPad to select acre. Touch tiles to change item");
 			sf2d_draw_rectangle(88-3, 36-3, 223+6, 179+6, COLOR_BLACK);
 			sf2d_draw_rectangle(88, 36, 223, 179, RGBA8(0x77, 0x77, 0x77, 0xFF));
+			
+			//draw acres
 			for(i = 0; i < 6; i++){
 				for(j = 0; j < 7; j++){
-					if(i == 0)
+					if(i == 0 && (acre_textures[acres[(i*7)+(j+1)]] != NULL)) //first row
 						sf2d_draw_texture_scale(acre_textures[acres[(i*7)+(j+1)]], 88+j*32, 36, 0.49, 0.49);
-					else
+					else if(acre_textures[acres[(i*7)+(j+1)]] != NULL) //all other rows
 						sf2d_draw_texture_scale(acre_textures[acres[(i*7)+(j+1)]], 88+j*32, 24+i*32, 0.49, 0.49);
-					sf2d_draw_rectangle(88+32, 36+20, 31, 31, RGBA8(0x00, 0x00, 0xFF, 0x03));
+				}
+			}
+			//draw acre cursor overlay
+			if(acre_cur_y == 0)
+				sf2d_draw_rectangle(88+32*acre_cur_x, 36, 31, 19, RGBA8(0x00, 0x00, 0xFF, 0x088));
+			else
+				sf2d_draw_rectangle(88+32*acre_cur_x, 24+32*acre_cur_y, 31, 31, RGBA8(0x00, 0x00, 0xFF, 0x88));
+			current_acre = (acre_cur_y*7)+(acre_cur_x+1);
+		sf2d_end_frame();
+		
+		//bottom screen (tiles)
+		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
+			sf2d_draw_rectangle(56-3, 15-3, 208+6, 208+6, COLOR_BLACK);
+			sf2d_draw_rectangle(56, 15, 208, 208, RGBA8(0x77, 0x77, 0x77, 0xFF));
+			for(i = 0; i < 16; i++){ //y
+				for(j = 0; j < 16; j++){ //x
+					sf2d_draw_texture_part_scale(acre_textures[acres[current_acre]], 56+j*13, 15+i*13, j*4, i*4, 4, 4, 3.00, 3.00);
 				}
 			}
 		sf2d_end_frame();
-		if(is3dsx){
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-		}
 		sf2d_swapbuffers();
 	}
 }
@@ -583,17 +536,18 @@ void map_tile_editor(){
 //player select & player menu
 void player_menu(int player){
 	int menuindex = 0;
-	int menucount = 7;
+	int menucount = 6;
 
 	char headerstr[] = "Select an option";
 	char* menu_entries[] = {
 		"Bank options",
-		"Change gender (here be dragons!)",
 		"Change tan shade",
 		"Change hair style",
 		"Change hair color",
 		"Change eye color",
-		"Change face type"
+		"Change face type",
+		"Change gender (here be dragons!)",
+		"Item editing options (not fully functional)",
 	};
 
 	while(aptMainLoop()){
@@ -607,22 +561,25 @@ void player_menu(int player){
 				bank_menu(player);
 				break;
 			case 1:
-				change_gender(player);
-				break;
-			case 2:
 				change_tan(player);
 				break;
-			case 3:
+			case 2:
 				change_hair_style(player);
 				break;
-			case 4:
+			case 3:
 				change_hair_color(player);
 				break;
-			case 5:
+			case 4:
 				change_eye_color(player);
 				break;
-			case 6:
+			case 5:
 				change_face(player);
+				break;
+			case 6:
+				change_gender(player);
+				break;
+			case 7:
+				item_menu(player);
 				break;
 		}
 	}
@@ -630,7 +587,11 @@ void player_menu(int player){
 
 void bank_menu(int player){
 	int menuindex = 0;
-	int menucount = 4;
+	int menucount;
+	if(devmode)
+		menucount = 4;
+	else
+		menucount = 3;
 
 	char headerstr[] = "Select an option";
 	char* menu_entries[] = {
@@ -695,13 +656,13 @@ void set_bank_balance(int player, int menuindex){
 	int i;
 	char* str = NULL;
 	
-	int bank_offset = (OFFSET_PLAYERS+SIZE_PLAYER*player)+0x6b6c;
+	int bank_offset = OFFSET_PLAYER_BANK+OFFSET_PLAYERS+SIZE_PLAYER*player;
 	int bank_ids_10k[] = {0xac, 0x18, 0x8f, 0x9d, 0x5b, 0x11, 0x14, 0xaa};
 	int bank_ids_25k[] = {0xe6, 0xcb, 0x78, 0xf4, 0x04, 0xa7, 0x17, 0xd7};
 	int bank_ids_50k[] = {0x8d, 0x47, 0xe7, 0x12, 0x4c, 0xee, 0x0b, 0x87};
 	int bank_ids_100k[] = {0xc2, 0xa6, 0xf1, 0x18, 0x4f, 0x71, 0x18, 0x2b};
 	int bank_ids_250k[] = {0x98, 0xd2, 0xce, 0xf1, 0x67, 0xa8, 0x00, 0xe3};
-	int bank_ids_500k[] = {0x11, 0xb3, 0x06, 0xe4, 0x46, OFFSET_PLAYERS, 0x01, 0x68};
+	int bank_ids_500k[] = {0x11, 0xb3, 0x06, 0xe4, 0x46, 0x20, 0x01, 0x68};
 	int bank_ids_1m[] = {0xf2, 0x78, 0x52, 0x7e, 0xb5, 0x2e, 0x08, 0xf4};
 	int bank_ids_5m[] = {0x3d, 0xa2, 0x18, 0x94, 0xb6, 0x46, 0x06, 0x45};
 	int bank_ids_10m[] = {0x1f, 0x4f, 0xfb, 0x62, 0xf5, 0x72, 0x05, 0x85};
@@ -764,108 +725,44 @@ void set_bank_balance(int player, int menuindex){
 			break;
 	}
 
-	while(aptMainLoop()){
-		hidScanInput();
-
-		if(hidKeysDown() & KEY_A)
-			break;
-
-		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Setting bank balance to %s... Done!", str);
-			sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-		sf2d_end_frame();
-		if(is3dsx){
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-		}
-		sf2d_swapbuffers();
-	}
+	gfx_waitmessage("Setting bank balance to %s... Done!", str);
 }
 
 void max_bank(int player){
 	int i;
 	//original IDs
 	int bank_ids[] = {0x78,0x56,0xf9,0x8c,0x36,0x86,0x11,0x0d};
-	int bank_offset = (OFFSET_PLAYERS+SIZE_PLAYER*player)+0x6b6c;
+	int bank_offset = OFFSET_PLAYER_BANK+OFFSET_PLAYERS+SIZE_PLAYER*player;
 
-	sf2d_start_frame(GFX_TOP, GFX_LEFT);
-		ui_frame();
-		sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Maxing bank... ");
-	sf2d_end_frame();
-	if(is3dsx){
-		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-		sf2d_end_frame();
-	}
-	sf2d_swapbuffers();
+	gfx_displaymessage("Maxing bank...");
 
 	for(i = 0; i < 8; i++){
 		storeByte(gardenData, bank_offset+i, bank_ids[i]);
 	}
-	
-	while(aptMainLoop()){
-		hidScanInput();
 
-		if(hidKeysDown() & KEY_A)
-			break;
-
-		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Maxing bank... Done!");
-			sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-		sf2d_end_frame();
-		if(is3dsx){
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-		}
-		sf2d_swapbuffers();
-	}
+	gfx_waitmessage("Maxing bank... Done!");
 }
 
 void wipe_bank(int player){
 	int i;
 	//original IDs
 	int bank_ids[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	int bank_offset = (OFFSET_PLAYERS+SIZE_PLAYER*player)+0x6b6c;
+	int bank_offset = OFFSET_PLAYER_BANK+OFFSET_PLAYERS+SIZE_PLAYER*player;
 
-	sf2d_start_frame(GFX_TOP, GFX_LEFT);
-		ui_frame();
-		sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Wiping bank... ");
-	sf2d_end_frame();
-	if(is3dsx){
-		sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-		sf2d_end_frame();
-	}
-	sf2d_swapbuffers();
+	gfx_displaymessage("Wiping bank...");
 
 	for(i = 0; i < 8; i++){
 		storeByte(gardenData, bank_offset+i, bank_ids[i]);
 	}
 	
-	while(aptMainLoop()){
-		hidScanInput();
-
-		if(hidKeysDown() & KEY_A)
-			break;
-
-		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Wiping bank... Done!");
-			sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-		sf2d_end_frame();
-		if(is3dsx){
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-		}
-		sf2d_swapbuffers();
-	}
+	gfx_waitmessage("Wiping bank... Done!");
 }
 
 void view_bank_ids(int player){
 	int i;
 	//original IDs
 	int bank_ids[8];
-	int bank_offset = (OFFSET_PLAYERS+SIZE_PLAYER*player)+0x6b6c;
+	int bank_offset = OFFSET_PLAYER_BANK+OFFSET_PLAYERS+SIZE_PLAYER*player;
 
 	for(i = 0; i < 8; i++){
 		bank_ids[i] = readByte1(gardenData, bank_offset+i);
@@ -878,7 +775,7 @@ void view_bank_ids(int player){
 			break;
 
 		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
+			ui_frame("View bank IDs");
 			for(i = 0; i < 8; i++){
 				sftd_draw_textf(font, 0, fontheight*(2+i), COLOR_WHITE, fontheight, "%d: 0x%02x", i, bank_ids[i]);
 			}
@@ -892,11 +789,186 @@ void view_bank_ids(int player){
 	}
 }
 
+void item_menu(int player){
+	int menuindex = 0;
+	int menucount = 4;
+
+	char headerstr[] = "Item editing options";
+
+	char* menu_entries[] = {
+		"Edit pockets",
+		"Edit dressers",
+		"Edit island box",
+		"Edit secret storage room"
+	};
+
+	while(aptMainLoop()){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+
+		switch(menuindex){
+			case 0:
+				edit_pockets(player);
+				break;
+			case 1:
+				edit_dressers(player);
+				break;
+			case 2:
+				edit_island_box(player);
+				break;
+			case 3:
+				edit_secret_storage_room(player);
+				break;
+		}
+	}
+}
+
+void edit_pockets(int player){
+	int menuindex = 0;
+	int menucount = SIZE_PLAYER_POCKETS;
+	int i;
+
+	char headerstr[] = "Select a pocket slot to edit its contents";
+
+	char* menu_entries[SIZE_PLAYER_POCKETS];
+
+	for(i = 0; i < SIZE_PLAYER_POCKETS; i++){
+		if(pockets[player][i].itemid != 0x7ffe){
+			menu_entries[i] = calloc(7, 1); //0xffff + '\0' = 7
+			sprintf(menu_entries[i], "0x%x", pockets[player][i].itemid);
+		}
+		else{
+			menu_entries[i] = "(None)";
+		}
+	}
+
+	while(aptMainLoop()){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+
+		gfx_waitmessage("Item ID: 0x%x", pockets[player][menuindex].itemid);
+	}
+
+	for(i = 0; i < SIZE_PLAYER_POCKETS; i++){
+		if(pockets[player][i].itemid != 0x7ffe)
+			free(menu_entries[i]);
+	}
+}
+
+void edit_dressers(int player){
+	int menuindex = 0;
+	int menucount = SIZE_PLAYER_DRESSERS;
+	int i;
+
+	char headerstr[] = "Select a dresser slot to edit its contents";
+
+	char* menu_entries[SIZE_PLAYER_DRESSERS];
+
+	for(i = 0; i < SIZE_PLAYER_DRESSERS; i++){
+		if(dressers[player][i].itemid != 0x7ffe){
+			menu_entries[i] = calloc(7, 1); //0xffff + '\0' = 7
+			sprintf(menu_entries[i], "0x%x", dressers[player][i].itemid);
+		}
+		else{
+			menu_entries[i] = "(None)";
+		}
+	}
+
+	while(aptMainLoop()){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+
+		gfx_waitmessage("Item ID: 0x%x", dressers[player][menuindex].itemid);
+	}
+	for(i = 0; i < SIZE_PLAYER_DRESSERS; i++){
+		if(dressers[player][i].itemid != 0x7ffe)
+			free(menu_entries[i]);
+	}
+}
+
+void edit_island_box(int player){
+	int menuindex = 0;
+	int menucount = SIZE_PLAYER_ISLANDBOX;
+	int i;
+
+	char headerstr[] = "Select a island box slot to edit its contents";
+
+	char* menu_entries[SIZE_PLAYER_ISLANDBOX];
+
+	for(i = 0; i < SIZE_PLAYER_ISLANDBOX; i++){
+		if(islandbox[player][i].itemid != 0x7ffe){
+			menu_entries[i] = calloc(7, 1); //0xffff + '\0' = 7
+			sprintf(menu_entries[i], "0x%x", islandbox[player][i].itemid);
+		}
+		else{
+			menu_entries[i] = "(None)";
+		}
+	}
+
+	while(aptMainLoop()){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+
+		gfx_waitmessage("Item ID: 0x%x", islandbox[player][menuindex].itemid);
+	}
+	for(i = 0; i < SIZE_PLAYER_ISLANDBOX; i++){
+		if(islandbox[player][i].itemid != 0x7ffe)
+			free(menu_entries[i]);
+	}
+}
+
+void edit_secret_storage_room(int player){
+	int menuindex = 0;
+	int menucount = SIZE_PLAYER_STORAGE;
+	int i;
+
+	char headerstr[] = "Select a secret storage slot to edit its contents";
+
+	char* menu_entries[SIZE_PLAYER_STORAGE];
+
+	for(i = 0; i < SIZE_PLAYER_STORAGE; i++){
+		if(storage[player][i].itemid != 0x7ffe){
+			menu_entries[i] = calloc(7, 1); //0xffff + '\0' = 7
+			sprintf(menu_entries[i], "0x%x", storage[player][i].itemid);
+		}
+		else{
+			menu_entries[i] = "(None)";
+		}
+	}
+
+	while(aptMainLoop()){
+		display_menu(menu_entries, menucount, &menuindex, headerstr);
+
+		if(menuindex == -1)
+			break;
+
+		gfx_waitmessage("Item ID: 0x%x", storage[player][menuindex].itemid);
+	}
+	for(i = 0; i < SIZE_PLAYER_STORAGE; i++){
+		if(storage[player][i].itemid != 0x7ffe)
+			free(menu_entries[i]);
+	}
+}
+
 void change_gender(int player){
 	int player_offset = OFFSET_PLAYERS+SIZE_PLAYER*player;
 	int menuindex = 0;
 	int menucount = 2;
 	char* str = NULL;
+	u8 gender = 0x00;
+	u16 player_id[11];
+	u32 offset;
+	bool found;
+	u32* player_id_references = NULL;
+	int i, j = 0;
 
 	char headerstr[] = "Select a gender";
 	char* menu_entries[] = {
@@ -904,26 +976,7 @@ void change_gender(int player){
 		"Female"
 	};
 
-	while(aptMainLoop()){
-		hidScanInput();
-
-		if(hidKeysDown() & KEY_A)
-			break;
-		else if(hidKeysDown() & KEY_B)
-			return;
-
-		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Warning! This will make your villagers forget who you");
-			sftd_draw_text(font, 0, fontheight*3, COLOR_WHITE, fontheight, "are! Press A if you still wish to continue, otherwise,");
-			sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "press B.");
-		sf2d_end_frame();
-		if(is3dsx){
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-		}
-		sf2d_swapbuffers();
-	}
+	gfx_prompt("Warning! This will make your villagers forget who you are!", "Press A to continue, otherwise, press B.");
 
 	while(aptMainLoop()){
 		display_menu(menu_entries, menucount, &menuindex, headerstr);
@@ -933,34 +986,40 @@ void change_gender(int player){
 		
 		switch(menuindex){
 			case 0:
-				storeByte(gardenData, player_offset+0x55ba, 0x00);
+				gender = 0x00;
 				break;
 			case 1:
-				storeByte(gardenData, player_offset+0x55ba, 0x01);
+				gender = 0x01;
 				break;
 		}
-
-		while(aptMainLoop()){
-			hidScanInput();
-
-			if(hidKeysDown() & KEY_A)
-				break;
-
-			sf2d_start_frame(GFX_TOP, GFX_LEFT);
-				ui_frame();
-				if(menuindex == 0)
-					str = "Changing gender to male... ";
-				else
-					str = "Changing gender to female... ";
-				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "%s Done!", str);
-				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-			sf2d_end_frame();
-			if(is3dsx){
-				sf2d_start_frame(GFX_BOTTOM, GFX_TOP);
-				sf2d_end_frame();
+		for(i = 0; i < 11; i++){
+			player_id[i] = readByte2(gardenData, player_offset+OFFSET_PLAYER_ID1+i*2);
+		}
+		if(player_id[0] != 0x0000){
+			for(offset = 0; offset < 522624-11*2; offset+=2){
+				found = true;
+				for(i = 0; i < 11 && found; i++){
+					if(readByte2(gardenData,offset+i*2) != player_id[i])
+						found = false;
+				}
 			}
-			sf2d_swapbuffers();
+			if(found){
+				j++;
+				player_id_references = realloc(player_id_references, j*sizeof(u32));
+				player_id_references[j-1] = offset;
+				offset += 11*2;
+			}
 		}
+		for(i = 0; i < j; i++){
+			storeByte(gardenData, player_id_references[i]+20, gender);
+		}
+		storeByte(gardenData, player_offset+OFFSET_PLAYER_GENDER, gender);
+
+		if(menuindex == 0)
+			str = "Changing gender to male... ";
+		else
+			str = "Changing gender to female... ";
+		gfx_waitmessage("%s Done!", str);
 	}
 }
 
@@ -978,25 +1037,9 @@ void change_tan(int player){
 		if(menuindex == -1)
 			break;
 		
-		storeByte(gardenData, player_offset+0x8, (u8)menuindex);
+		storeByte(gardenData, player_offset+OFFSET_PLAYER_TAN, (u8)menuindex);
 
-		while(aptMainLoop()){
-			hidScanInput();
-
-			if(hidKeysDown() & KEY_A)
-				break;
-
-			sf2d_start_frame(GFX_TOP, GFX_LEFT);
-				ui_frame();
-				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Changing tan value to %d... Done!", menuindex);
-				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-			sf2d_end_frame();
-			if(is3dsx){
-				sf2d_start_frame(GFX_BOTTOM, GFX_TOP);
-				sf2d_end_frame();
-			}
-			sf2d_swapbuffers();
-		}
+		gfx_waitmessage("Changing tan value to %d... Done!", menuindex);
 	}
 }
 
@@ -1026,25 +1069,9 @@ void change_hair_style(int player){
 		if(menuindex == -1)
 			break;
 
-		storeByte(gardenData, player_offset+0x04, (u8)menuindex);
+		storeByte(gardenData, player_offset+OFFSET_PLAYER_HAIRSTYLE, (u8)menuindex);
 
-		while(aptMainLoop()){
-			hidScanInput();
-
-			if(hidKeysDown() & KEY_A)
-				break;
-
-			sf2d_start_frame(GFX_TOP, GFX_LEFT);
-				ui_frame();
-				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Changing hair style to %s... Done!", menu_entries[menuindex]);
-				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-			sf2d_end_frame();
-			if(is3dsx){
-				sf2d_start_frame(GFX_BOTTOM, GFX_TOP);
-				sf2d_end_frame();
-			}
-			sf2d_swapbuffers();
-		}
+		gfx_waitmessage("Changing hair style to %s... Done!", menu_entries[menuindex]);
 	}
 	for(i = 0; i < 34; i++)
 		free(menu_entries[i]);
@@ -1081,25 +1108,9 @@ void change_hair_color(int player){
 		if(menuindex == -1)
 			break;
 
-		storeByte(gardenData, player_offset+0x05, (u8)menuindex);
+		storeByte(gardenData, player_offset+OFFSET_PLAYER_HAIRCOLOR, (u8)menuindex);
 
-		while(aptMainLoop()){
-			hidScanInput();
-
-			if(hidKeysDown() & KEY_A)
-				break;
-
-			sf2d_start_frame(GFX_TOP, GFX_LEFT);
-				ui_frame();
-				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Changing hair color to %s... Done!", menu_entries[menuindex]);
-				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-			sf2d_end_frame();
-			if(is3dsx){
-				sf2d_start_frame(GFX_BOTTOM, GFX_TOP);
-				sf2d_end_frame();
-			}
-			sf2d_swapbuffers();
-		}
+		gfx_waitmessage("Changing hair color to %s... Done!", menu_entries[menuindex]);
 	}
 }
 
@@ -1117,25 +1128,9 @@ void change_eye_color(int player){
 		if(menuindex == -1)
 			break;
 
-		storeByte(gardenData, player_offset+0x07, (u8)menuindex);
+		storeByte(gardenData, player_offset+OFFSET_PLAYER_EYECOLOR, (u8)menuindex);
 
-		while(aptMainLoop()){
-			hidScanInput();
-
-			if(hidKeysDown() & KEY_A)
-				break;
-
-			sf2d_start_frame(GFX_TOP, GFX_LEFT);
-				ui_frame();
-				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Changing eye color to %d... Done!", menuindex);
-				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-			sf2d_end_frame();
-			if(is3dsx){
-				sf2d_start_frame(GFX_BOTTOM, GFX_TOP);
-				sf2d_end_frame();
-			}
-			sf2d_swapbuffers();
-		}
+		gfx_waitmessage("Changing eye color to %d... Done!", menuindex);
 	}
 }
 
@@ -1153,25 +1148,9 @@ void change_face(int player){
 		if(menuindex == -1)
 			break;
 
-		storeByte(gardenData, player_offset+0x06, (u8)menuindex);
+		storeByte(gardenData, player_offset+OFFSET_PLAYER_FACE, (u8)menuindex);
 
-		while(aptMainLoop()){
-			hidScanInput();
-
-			if(hidKeysDown() & KEY_A)
-				break;
-
-			sf2d_start_frame(GFX_TOP, GFX_LEFT);
-				ui_frame();
-				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Changing face type to %d... Done!", menuindex);
-				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-			sf2d_end_frame();
-			if(is3dsx){
-				sf2d_start_frame(GFX_BOTTOM, GFX_TOP);
-				sf2d_end_frame();
-			}
-			sf2d_swapbuffers();
-		}
+		gfx_waitmessage("Changing face type to %d... Done!", menuindex);
 	}
 }
 
@@ -1179,7 +1158,7 @@ void change_face(int player){
 //villager select & villager menu
 void villager_menu(int villager){
 	int menuindex = 0;
-	int menucount = 3;
+	int menucount = 1;
 
 	char headerstr[] = "Select an option";
 	char* menu_entries[] = {
@@ -1260,28 +1239,32 @@ void toggle_boxed(int villager){
 
 	storeByte(gardenData, villager_offset+OFFSET_VILLAGER_STATUS, (status & 0x000000ff));
 
-	while(aptMainLoop()){
-		hidScanInput();
-
-		if(hidKeysDown() & KEY_A)
-			break;
-
-		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "%s villager... Done!", str);
-			sftd_draw_text(font, 0, fontheight*3, COLOR_WHITE, fontheight, "Press the A key to continue.");
-		sf2d_end_frame();
-		if(is3dsx){
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-		}
-		sf2d_swapbuffers();
-	}
+	gfx_waitmessage("%s villager... Done!", str);
 }
 
 void reset_villager(int villager){
-	villager = villager;
 	//TODO
+	int villager_offset = OFFSET_VILLAGERS+SIZE_VILLAGER*villager;
+	int i;
+	u16 itemid;
+	u8 flag1;
+	u8 flag2;
+
+	gfx_displaymessage("Resetting villager to defaults...");
+	set_ustring(gardenData, villager_offset+OFFSET_VILLAGER_CATCHPHRASE, villagers[villager].catchphrase, 11);
+	//0-4 = shirt, song, wall, floor, umbrella. 5-21 furnature
+	for(i = 0; i < 21; i++){
+		itemid = villagers[villager].data[i] & 0xffff;
+		flag1 = villagers[villager].data[i] >> 16 & 0xff;
+		flag2 = villagers[villager].data[i] >> 24 & 0xff;
+	
+		storeByte2(gardenData, villager_offset+OFFSET_VILLAGER_SHIRT+4*i, itemid);
+		storeByte(gardenData, villager_offset+OFFSET_VILLAGER_SHIRT+4*i+2, flag1);
+		storeByte(gardenData, villager_offset+OFFSET_VILLAGER_SHIRT+4*i+3, flag2);
+	}
+	//unknown last 4 bytes
+	storeByte4(gardenData, villager_offset+OFFSET_VILLAGER_SHIRT+4*21, villagers[villager].data[21]);
+	gfx_waitmessage("Resetting villager to defaults... Done!");
 }
 
 void set_villager(int villager){
@@ -1296,55 +1279,21 @@ void set_villager(int villager){
 //misc menu
 void unlock_all_pwps(){
 	unsigned int i;
-	char* str;
 
 	if(gardenData == NULL){
-		while(aptMainLoop()){
-			hidScanInput();
-
-			if(hidKeysDown() & KEY_A)
-				break;
-
-			sf2d_start_frame(GFX_TOP, GFX_LEFT);
-				ui_frame();
-				sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Please load a file first!");
-				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A key to continue.");
-			sf2d_end_frame();
-			if(is3dsx){
-				sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-				sf2d_end_frame();
-			}
-			sf2d_swapbuffers();
-		}
+		gfx_waitmessage("Please load a file first!");
 		return;
 	}
 	u8 pwp_ids[]={
 		0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-		0xff,0xff,0xff,0xff,0x2a,0xd6,0xe4,0x58
+		0xff,0xff,0xff,0xff
 	};
 
 	for(i = 0; i < sizeof(pwp_ids)/sizeof(u8); i++){
-		storeByte(gardenData, 0x04d9c8+i, pwp_ids[i]);
+		storeByte(gardenData, OFFSET_TOWN_AVAILABLEPWPS+i, pwp_ids[i]);
 	}
 	
-	while(aptMainLoop()){
-		hidScanInput();
-
-		if(hidKeysDown() & KEY_A)
-			break;
-
-		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			str = "Unlocking all PWPs... ";
-			sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "%s Done!", str);
-			sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-		sf2d_end_frame();
-		if(is3dsx){
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-		}
-		sf2d_swapbuffers();
-	}
+	gfx_waitmessage("Unlocking all PWPs... Done!");
 }
 
 
@@ -1370,43 +1319,11 @@ void list_test(){
 		if(menuindex == -1)
 			break;
 
-		while(aptMainLoop()){
-			hidScanInput();
-
-			if(hidKeysDown() & KEY_A)
-				break;
-
-			sf2d_start_frame(GFX_TOP, GFX_LEFT);
-				ui_frame();
-				sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "menuindex: %d", menuindex);
-				sftd_draw_text(font, 0, fontheight*4, COLOR_WHITE, fontheight, "Press the A button to continue.");
-			sf2d_end_frame();
-			if(is3dsx){
-				sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-				sf2d_end_frame();
-			}
-			sf2d_swapbuffers();
-		}
+		gfx_waitmessage("menuindex: %d", menuindex);
 	}
 
 	for(i = 0; i < sizeof(list)/sizeof(list[0]); i++){
 		free(list[i]);
-	}
-	while(aptMainLoop()){
-		hidScanInput();
-
-		if(hidKeysDown() & KEY_A)
-			break;
-
-		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			sftd_draw_text(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Press the A button to continue.");
-		sf2d_end_frame();
-		if(is3dsx){
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-		}
-		sf2d_swapbuffers();
 	}
 }
 
@@ -1419,23 +1336,7 @@ void view_apt_id(){
 	else
 		sf2d_set_clear_color(RGBA8(0xFF, 0x00, 0x00, 0xFF)); //red
 
-	while(aptMainLoop()){
-		hidScanInput();
-
-		if(hidKeysDown() & KEY_A)
-			break;
-
-		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "APT ID: %llx", id);
-			sftd_draw_text(font, 0, fontheight*3, COLOR_WHITE, fontheight, "Press the A key to continue.");
-		sf2d_end_frame();
-		if(is3dsx){
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-		}
-		sf2d_swapbuffers();
-	}
+	gfx_waitmessage("APT ID: %llx", id);
 	
 	sf2d_set_clear_color(RGBA8(0x00, 0x2e, 0x00, 0xFF));
 }
@@ -1443,21 +1344,5 @@ void view_apt_id(){
 void display_status_id(int villager){
 	int villager_offset = OFFSET_VILLAGERS+SIZE_VILLAGER*villager;
 	u32 status_id = readByte4(gardenData, villager_offset+OFFSET_VILLAGER_STATUS);
-	while(aptMainLoop()){
-		hidScanInput();
-
-		if(hidKeysDown() & KEY_A)
-			break;
-
-		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			sftd_draw_textf(font, 0, fontheight*2, COLOR_WHITE, fontheight, "Status ID: 0x%x", status_id);
-			sftd_draw_text(font, 0, fontheight*3, COLOR_WHITE, fontheight, "Press the A key to continue.");
-		sf2d_end_frame();
-		if(is3dsx){
-			sf2d_start_frame(GFX_BOTTOM, GFX_LEFT);
-			sf2d_end_frame();
-		}
-		sf2d_swapbuffers();
-	}
+	gfx_waitmessage("Status ID: 0x%x", status_id);
 }

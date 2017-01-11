@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include <3ds.h>
 #include <sf2d.h>
@@ -14,6 +15,7 @@ static int fontheight = 11;
 
 void display_menu(char **menu_entries, int total_entries, int *menupos, char *headerstr){
 	int i, j;
+	int jumplen; //number of entries to jump when pressing left or right
 	u32 kDown = 0;
 	int rows = 21; //27 changed to 21 due to font size changing
 	int startpos = 0;
@@ -24,9 +26,7 @@ void display_menu(char **menu_entries, int total_entries, int *menupos, char *he
 		kDown = hidKeysDown();
 	
 		sf2d_start_frame(GFX_TOP, GFX_LEFT);
-			ui_frame();
-			sftd_draw_textf(font_bold, 1, 1, COLOR_BLACK, fontheight, "%s", headerstr);
-			sftd_draw_textf(font_bold, 0, 0, COLOR_WHITE, fontheight, "%s", headerstr);
+			ui_frame(headerstr);
 
 			j = 0;
 			//if more total_entries than max rows
@@ -57,7 +57,7 @@ void display_menu(char **menu_entries, int total_entries, int *menupos, char *he
 		sf2d_end_frame();
 		sf2d_swapbuffers();
 
-		if(kDown & (KEY_UP | KEY_LEFT)){
+		if(kDown & KEY_UP){
 			(*menupos)--;
 			if(*menupos < 0){
 				startpos = total_entries-rows+2;
@@ -67,7 +67,21 @@ void display_menu(char **menu_entries, int total_entries, int *menupos, char *he
 				startpos--;
 			}
 		}
-		else if(kDown & (KEY_DOWN | KEY_RIGHT)){
+		else if(kDown & KEY_LEFT){
+			if(total_entries < rows-3) // when it fits on a page
+				jumplen = total_entries-1;
+			else
+				jumplen = rows - 4;
+			(*menupos) -= jumplen;
+			if(*menupos < 0){
+				startpos = total_entries-rows+2;
+				*menupos = total_entries-1;
+			}
+			else if(*menupos < startpos){
+				startpos = *menupos;
+			}
+		}
+		else if(kDown & KEY_DOWN){
 			(*menupos)++;
 			if(*menupos == total_entries){
 				startpos = 0;
@@ -75,6 +89,19 @@ void display_menu(char **menu_entries, int total_entries, int *menupos, char *he
 			}
 			else if((*menupos-startpos) > rows-3)
 				startpos++;
+		}
+		else if(kDown & KEY_RIGHT){
+			if(total_entries < rows-3) // when it fits on a page
+				jumplen = total_entries-1;
+			else
+				jumplen = rows - 4;
+			(*menupos)+=jumplen;
+			if(*menupos >= total_entries){
+				startpos = 0;
+				*menupos = 0;
+			}
+			else if((*menupos-startpos) > rows-3)
+				startpos += jumplen;
 		}
 		else if(kDown & KEY_A)
 			return;

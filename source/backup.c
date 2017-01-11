@@ -8,248 +8,202 @@
 
 #include "common.h"
 #include "gfx.h"
+#include "fs.h"
+#include "backup.h"
 
-FS_Archive game_arch, sdmc_arch;
-
-Result backup_init(){
-	Handle fs_handle;
+u64 filesize_to_u64(FS_Archive arch, char* filepath){
+	u64 file_size;
 	Result ret;
-	u64 titleid;
-	u32 lowerid, upperid;
-	u32* path;
-	FS_Path null_binpath, game_binpath;
+	Handle file_handle;
 
-	if(is3dsx){
-		fsInit();
-		ret = srvGetServiceHandleDirect(&fs_handle, "fs:USER");
-		if(ret)
-			return ret;
-		ret = FSUSER_Initialize(fs_handle);
-		if(ret)
-			return ret;
-
-		fsUseSession(fs_handle);
-	}
-	
-	//open sdmc card
-	null_binpath = (FS_Path){PATH_EMPTY, 1, (u8*)""};
-	ret = FSUSER_OpenArchive(&sdmc_arch, ARCHIVE_SDMC, null_binpath);
+	//open file
+	ret = FSUSER_OpenFile(&file_handle, arch, fsMakePath(PATH_ASCII, filepath), FS_OPEN_READ, 0);
 	if(ret)
-		return ret;
+		gfx_error(ret, __FILENAME__, __LINE__);
 
-	amInit();
-	titleid = 0x0004000000086300;
-	lowerid = (u32)(titleid);
-	upperid = (u32)(titleid >> 32);
-	if(is3dsx){
-		ret = FSUSER_OpenArchive(&game_arch, ARCHIVE_SAVEDATA, fsMakePath(PATH_EMPTY, ""));
-		if(ret)
-			return ret;
-	}
-	else{
-		path = (u32[3]){2, lowerid, upperid};
-		game_binpath = (FS_Path){PATH_BINARY, 12, path};
-		ret = FSUSER_OpenArchive(&game_arch, ARCHIVE_USER_SAVEDATA, game_binpath);
-		if(ret)
-			return ret;
-	}
+	//get size off file
+	FSFILE_GetSize(file_handle, &file_size);
 
-	return ret;
-}
-
-Result backup_fini(){
-	Result ret;
-
-	ret = FSUSER_CloseArchive(game_arch);
-	ret |= FSUSER_CloseArchive(sdmc_arch);
-
-	if(is3dsx){
-		fsEndUseSession();
-		fsExit();
-	}
-	amExit();
-
-	return ret;
-}
-
-char* game_to_buffer(){
-	u32 read; //bytes read
-	u64 game_file_size;
-	char* buffer = NULL;
-	Result ret;
-	Handle game_file_handle;
-
-	//open garden.dat
-	ret = FSUSER_OpenFile(&game_file_handle, game_arch, fsMakePath(PATH_ASCII, "/garden.dat"), FS_OPEN_READ, 0);
-	if(ret){
-	}
-
-	//get size of garden.dat
-	FSFILE_GetSize(game_file_handle, &game_file_size);
-	if(game_file_size != GARDEN_SIZE){
-		gfx_waitmessage("Corrupt save file detected! Aborting...");
-		goto close_files;
-	}
-
-	//allocate space for garden.dat in buffer
-	buffer = malloc(game_file_size+1);
-	if(!buffer){
-		gfx_waitmessage("malloc failed!");
-		goto close_files;
-	}
-
-	//read garden.dat into buffer
-	ret = FSFILE_Read(game_file_handle, &read, 0, buffer, game_file_size);
-	if(ret){
-		gfx_error(ret, __LINE__);
-		goto close_files;
-	}
-close_files:
-
-	ret = FSFILE_Close(game_file_handle);
+	//close handle
+	ret = FSFILE_Close(file_handle);
 	if(ret)
-		gfx_error(ret, __LINE__);
-	if(read == GARDEN_SIZE)
-		return buffer;
-	else
-		return "";
+		gfx_error(ret, __FILENAME__, __LINE__);
+
+	return file_size;
 }
 
-void buffer_to_game(char* buffer){
+int buffer_to_file(FS_Archive arch, char* buffer, u64 size, char* dirpath, char* filename){
+	int error = 0;
 	u32 written; //bytes written
-	Result ret;
-	Handle game_file_handle;
-	
-	//Writing
-	ret = FSUSER_OpenFile(&game_file_handle, game_arch, fsMakePath(PATH_ASCII, "/garden.dat"), FS_OPEN_WRITE, 0);
-	if(ret){
-		gfx_error(ret, __LINE__);
-		goto close_files;
-	}
-
-	ret = FSFILE_Write(game_file_handle, &written, 0, buffer, GARDEN_SIZE, FS_WRITE_FLUSH);
-	if(ret){
-		gfx_error(ret, __LINE__);
-		goto close_files;
-	}
-	if(written != GARDEN_SIZE){
-		gfx_waitmessage("cartridge's garden.dat incorrectly written to!");
-		goto close_files;
-	}
-
-	close_files:
-
-	ret = FSFILE_Close(game_file_handle);
-	if(ret)
-		gfx_error(ret, __LINE__);
-
-	ret = FSUSER_ControlArchive(game_arch, ARCHIVE_ACTION_COMMIT_SAVE_DATA, NULL, 0, NULL, 0);
-	if(ret)
-		gfx_error(ret, __LINE__);
-}
-
-void buffer_to_dir(char* buffer, char* dirname){
-	u32 written; //bytes written
-	char* path_out;
 	char* file_out;
 	Result ret;
-	Handle sdmc_file_handle;
+	Handle file_handle;
 
-	path_out = calloc(100, 1);
-	strcat(path_out, "/Pocket-NLSE/Saves/");
-	strcat(path_out, dirname);
-	strcat(path_out, "/");
-	//attempt to create directory "/Pocket-NLSE/Saves/" if not able,
-	//create parent directories until it works
-	ret = FSUSER_CreateDirectory(sdmc_arch, fsMakePath(PATH_ASCII, path_out), 0);
+	//Writing
+	file_out = calloc(strlen(dirpath)+strlen(filename)+1, 1);
+	sprintf(file_out, "%s%s", dirpath, filename);
+
+	ret = FSUSER_OpenFile(&file_handle, arch, fsMakePath(PATH_ASCII, file_out), FS_OPEN_WRITE | FS_OPEN_CREATE, 0);
+	free(file_out);
 	if(ret){
-		if(ret == (Result)0xc8804478){
-			ret = FSUSER_CreateDirectory(sdmc_arch, fsMakePath(PATH_ASCII, "/Pocket-NLSE/Saves/"), 0);
-			if(ret == (Result)0xc8804478){
-				ret = FSUSER_CreateDirectory(sdmc_arch, fsMakePath(PATH_ASCII, "/Pocket-NLSE/"), 0);
-			}
-			FSUSER_CreateDirectory(sdmc_arch, fsMakePath(PATH_ASCII, path_out), 0);
+	  gfx_error(ret, __FILENAME__, __LINE__);
+	  error = 1;
+	  goto btf_close_files;
+	}
+
+	ret = FSFILE_Write(file_handle, &written, 0, buffer, size, FS_WRITE_FLUSH | FS_WRITE_UPDATE_TIME);
+	if(ret){
+		gfx_error(ret, __FILENAME__, __LINE__);
+		error = 1;
+		goto btf_close_files;
+	}
+	if(written != size){
+		gfx_waitmessage("local %s incorrectly written to!", filename);
+		error = 1;
+		goto btf_close_files;
+	}
+	if(arch == game_arch){
+		ret = FSUSER_ControlArchive(game_arch, ARCHIVE_ACTION_COMMIT_SAVE_DATA, NULL, 0, NULL, 0);
+		if(ret){
+			gfx_error(ret, __FILENAME__, __LINE__);
+			error = 1;
 		}
 	}
 
-	//Writing
-	file_out = calloc(strlen(path_out)+11, 1); //11 = garden.dat + '\0'
-	sprintf(file_out, "%sgarden.dat", path_out);
+btf_close_files:
 
-	ret = FSUSER_OpenFile(&sdmc_file_handle, sdmc_arch, fsMakePath(PATH_ASCII, file_out), FS_OPEN_WRITE | FS_OPEN_CREATE, 0);
+	ret = FSFILE_Close(file_handle);
 	if(ret){
-	  gfx_error(ret, __LINE__);
-	  goto close_files;
+		gfx_error(ret, __FILENAME__, __LINE__);
+		error = 1;
 	}
-
-	ret = FSFILE_Write(sdmc_file_handle, &written, 0, buffer, GARDEN_SIZE, FS_WRITE_FLUSH);
-	if(ret){
-		gfx_error(ret, __LINE__);
-		goto close_files;
-	}
-	if(written != GARDEN_SIZE){
-		gfx_waitmessage("local garden.dat incorrectly written to!");
-		goto close_files;
-	}
-
-close_files:
-
-	ret = FSFILE_Close(sdmc_file_handle);
-	if(ret)
-		gfx_error(ret, __LINE__);
+	if(error == 1){
+		return -1;
+	} else
+		return 0;
 }
 
-char* dir_to_buffer(char* dirname){
+char* file_to_buffer(FS_Archive arch, char* dirpath, char* filename){
+	int error = 0;
 	u32 read; //bytes read/written
-	u64 sdmc_file_size;
-	char* path_in;
+	u64 file_size;
 	char* file_in;
 	char* buffer = NULL;
 	Result ret;
-	Handle sdmc_file_handle;
-	
-	path_in = calloc(100, 1);
-	strcat(path_in, "/Pocket-NLSE/Saves/");
-	strcat(path_in, dirname);
-	strcat(path_in, "/");
-	
-	file_in = calloc(strlen(path_in)+11, 1); //11 = garden.dat + '\0'
-	sprintf(file_in, "%sgarden.dat", path_in);
+	Handle file_handle;
 
-	//open garden.dat
-	ret = FSUSER_OpenFile(&sdmc_file_handle, sdmc_arch, fsMakePath(PATH_ASCII, file_in), FS_OPEN_READ, 0);
+	file_in = calloc(strlen(dirpath)+strlen(filename)+1, 1);
+	sprintf(file_in, "%s%s", dirpath, filename);
+
+	//open file
+	ret = FSUSER_OpenFile(&file_handle, arch, fsMakePath(PATH_ASCII, file_in), FS_OPEN_READ, 0);
+	free(file_in);
 	if(ret){
-		gfx_error(ret, __LINE__);
-		goto close_files;
+		gfx_error(ret, __FILENAME__, __LINE__);
+		error = 1;
+		goto ftb_close_files;
 	}
 
-	//get size of garden.dat
-	FSFILE_GetSize(sdmc_file_handle, &sdmc_file_size);
+	//get size of file
+	ret = FSFILE_GetSize(file_handle, &file_size);
+	if(ret){
+		gfx_error(ret, __FILENAME__, __LINE__);
+		error = 1;
+		goto ftb_close_files;
+	}
 
-	//allocate space for garden.dat in buffer
-	buffer = malloc(sdmc_file_size+1);
+	//allocate space for file in buffer
+	buffer = malloc(file_size+1);
 	if(!buffer){
 		gfx_waitmessage("malloc failed!");
-		goto close_files;
+		error = 1;
+		goto ftb_close_files;
 	}
 
-	//read garden.dat into buffer
-	ret = FSFILE_Read(sdmc_file_handle, &read, 0, buffer, sdmc_file_size);
+	//read file into buffer
+	ret = FSFILE_Read(file_handle, &read, 0, buffer, file_size);
 	if(ret){
-		gfx_error(ret, __LINE__);
-		goto close_files;
+		gfx_error(ret, __FILENAME__, __LINE__);
+		error = 1;
+		goto ftb_close_files;
 	}
-	if(read != GARDEN_SIZE){
-		gfx_waitmessage("Problem reading from file!");
-		buffer = "";
-		goto close_files;
+	if(read != file_size){
+		gfx_waitmessage("Problem reading from %s!", filename);
+		error = 1;
+		goto ftb_close_files;
 	}
 
-	close_files:
+	ftb_close_files:
 
-	ret = FSFILE_Close(sdmc_file_handle);
-	if(ret)
-		gfx_error(ret, __LINE__);
-	
-	return buffer;
+	ret = FSFILE_Close(file_handle);
+	if(ret){
+		gfx_error(ret, __FILENAME__, __LINE__);
+		error = 1;
+	}
+	if(error == 1){
+		gfx_waitmessage("Uh oh! Errors occurred while running file_to_buffer!");
+		free(buffer);
+		return NULL;
+	}
+	else
+		return buffer;
+}
+
+void backup_to_prev_folder(char* dirname){
+	Result ret;
+	file_t files;
+	u64 size;
+	char* gamepath = "/";
+	char* savespath = "/Pocket-NLSE/Saves/";
+	char* sdmcpath;
+	char* filepath;
+	char* buf;
+	int error = 0;
+	int i;
+
+	FSUSER_CreateDirectory(sdmc_arch, fsMakePath(PATH_ASCII, savespath), 0);
+	//Erase sdmc data
+	sdmcpath = calloc(strlen(savespath)+strlen(dirname)+1+1, 1);
+	sprintf(sdmcpath, "%s%s/", savespath, dirname);
+	FSUSER_CreateDirectory(sdmc_arch, fsMakePath(PATH_ASCII, sdmcpath), 0);
+	files = get_files(sdmc_arch, sdmcpath);
+	if(files.numfiles != 0){
+		gfx_displaymessage("Erasing old files from the SD card...");
+		for(i = 0; i < files.numfiles; i++){
+			filepath = calloc(strlen(savespath)+strlen(dirname)+1+strlen(files.files[i])+1, 1);
+			sprintf(filepath, "%s%s/%s", savespath, dirname, files.files[i]);
+			ret = FSUSER_DeleteFile(sdmc_arch, fsMakePath(PATH_ASCII, filepath));
+			if(ret){
+				gfx_error(ret, __FILENAME__, __LINE__);
+				return;
+			}
+			free(filepath);
+		}
+	}
+	free(sdmcpath);
+	//backup saves
+	sdmcpath = calloc(strlen(savespath)+strlen(dirname)+1+1, 1);
+	sprintf(sdmcpath, "%s%s/", savespath, dirname);
+	files = get_files(game_arch, "/");
+	for(i = 0; i < files.numfiles; i++){
+		gfx_displaymessage("Backing up %s to %s...", files.files[i], dirname);
+		buf = file_to_buffer(game_arch, gamepath, files.files[i]);
+		if(!buf){
+			gfx_waitmessage("Error: buffer empty!");
+			break;
+		}
+		filepath = calloc(strlen(gamepath)+strlen(files.files[i])+1, 1);
+		sprintf(filepath, "%s%s", gamepath, files.files[i]);
+		size = filesize_to_u64(game_arch, filepath);
+		error = buffer_to_file(sdmc_arch, buf, size, sdmcpath, files.files[i]);
+		if(error == -1){
+			gfx_waitmessage("buffer_to_file failed!");
+		}
+		free(filepath);
+		free(buf);
+		if(error < 0)
+			break;
+	}
+	free(sdmcpath);
+	gfx_waitmessage("Done backing up game to %s", dirname);
 }

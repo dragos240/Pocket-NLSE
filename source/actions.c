@@ -7,57 +7,57 @@
 #include <3ds.h>
 
 #include "common.h"
+#include "gfx.h"
 #include "actions.h"
 #include "menu.h"
 
 u8 data_offset = 0x80;
 
-void init_garden(u8* data, town_t* town){
-	init_town(data, town);
-}
+item_t map_items[SIZE_MAP_ITEMS];
+item_t pockets[4][SIZE_PLAYER_POCKETS];
+item_t dressers[4][SIZE_PLAYER_DRESSERS];
+item_t islandbox[4][SIZE_PLAYER_ISLANDBOX];
+item_t storage[4][SIZE_PLAYER_STORAGE];
 
-void init_town(u8* data, town_t* town){
-	u32 i, offset;
-	u32* town_ids;
-
-	town->town_id1 = readByte1(data, 0x05c738);
-	town->town_id2 = readByte1(data, 0x05c738+1);
-
-	town->grass_type = readByte1(data, 0x04da01);
-	town->town_name = calloc(11, 1);
-	town->town_name = get_ustring(data, 0x5c73a, 10);
-
-	//town IDs
-	town_ids = malloc(5 * sizeof(u32));
-	for(i = 0; i < 5; i++){
-		town_ids[i] = readByte4(data, 0x05c738+i*4);
+void items_init(u8* data){
+	int i, j;
+	//map items
+	for(i = 0; i < SIZE_MAP_ITEMS; i++){
+		map_items[i].itemid = readByte2(data, OFFSET_MAP_ITEMS+i*4);
+		map_items[i].flag1 = readByte1(data, OFFSET_MAP_ITEMS+i*4+2);
+		map_items[i].flag2 = readByte1(data, OFFSET_MAP_ITEMS+i*4+3);
 	}
-
-	//town ID references
-	town->town_id_refs = calloc(522604, sizeof(u32));
-	for(offset = 0; offset < 522624-5*4; offset+=2){
-		u8 found = 1;
-		for(i = 0; i < 5 && found; i++){
-			if(readByte4(data, offset+i*4) != town_ids[i]){
-				found = 0;
-			}
-		}
-		if(found){
-			town->town_id_refs[offset] = offset;
-			offset += 5*4;
+	//player pockets
+	for(i = 0; i < 4; i++){
+		for(j = 0; j < SIZE_PLAYER_POCKETS; j++){
+			pockets[i][j].itemid = readByte2(data, OFFSET_PLAYERS+SIZE_PLAYER*i+OFFSET_PLAYER_POCKETS+j*4);
+			pockets[i][j].flag1 = readByte1(data, OFFSET_PLAYERS+SIZE_PLAYER*i+OFFSET_PLAYER_POCKETS+j*4+2);
+			pockets[i][j].flag2 = readByte1(data, OFFSET_PLAYERS+SIZE_PLAYER*i+OFFSET_PLAYER_POCKETS+j*4+3);
 		}
 	}
-	free(town_ids);
-}
-
-void save_town(u8* data, town_t* town){
-	u32 i;
-
-	storeByte(data, 0x04da01, town->grass_type);
-
-	for(i = 0; i < 522604; i++){
-		storeByte(data, town->town_id_refs[i], town->town_id1);
-		storeByte(data, town->town_id_refs[i]+1, town->town_id2);
+	//player dressers
+	for(i = 0; i < 4; i++){
+		for(j = 0; j < SIZE_PLAYER_DRESSERS; j++){
+			dressers[i][j].itemid = readByte2(data, OFFSET_PLAYERS+SIZE_PLAYER*i+OFFSET_PLAYER_DRESSERS+j*4);
+			dressers[i][j].flag1 = readByte1(data, OFFSET_PLAYERS+SIZE_PLAYER*i+OFFSET_PLAYER_DRESSERS+j*4+2);
+			dressers[i][j].flag2 = readByte1(data, OFFSET_PLAYERS+SIZE_PLAYER*i+OFFSET_PLAYER_DRESSERS+j*4+3);
+		}
+	}
+	//player island box storage
+	for(i = 0; i < 4; i++){
+		for(j = 0; j < SIZE_PLAYER_ISLANDBOX; j++){
+			islandbox[i][j].itemid = readByte2(data, OFFSET_PLAYERS+SIZE_PLAYER*i+OFFSET_PLAYER_ISLANDBOX+j*4);
+			islandbox[i][j].flag1 = readByte1(data, OFFSET_PLAYERS+SIZE_PLAYER*i+OFFSET_PLAYER_ISLANDBOX+j*4+2);
+			islandbox[i][j].flag2 = readByte1(data, OFFSET_PLAYERS+SIZE_PLAYER*i+OFFSET_PLAYER_ISLANDBOX+j*4+3);
+		}
+	}
+	//player secret storage
+	for(i = 0; i < 4; i++){
+		for(j = 0; j < SIZE_PLAYER_STORAGE; j++){
+			storage[i][j].itemid = readByte2(data, OFFSET_PLAYERS+SIZE_PLAYER*i+OFFSET_PLAYER_STORAGE+j*4);
+			storage[i][j].flag1 = readByte1(data, OFFSET_PLAYERS+SIZE_PLAYER*i+OFFSET_PLAYER_STORAGE+j*4+2);
+			storage[i][j].flag2 = readByte1(data, OFFSET_PLAYERS+SIZE_PLAYER*i+OFFSET_PLAYER_STORAGE+j*4+3);
+		}
 	}
 }
 
@@ -105,6 +105,13 @@ void storeByte2(u8* dst_data, u32 pos, u16 src_data){
 	storeByte(dst_data, pos+1, src_data/256);
 }
 
+void storeByte4(u8* dst_data, u32 pos, u32 src_data){
+	storeByte(dst_data, pos, src_data & 0x000000ff);
+	storeByte(dst_data, pos+1, (src_data & 0x0000ff00) >> 8);
+	storeByte(dst_data, pos+2, (src_data & 0x00ff0000) >> 16);
+	storeByte(dst_data, pos+2, (src_data & 0xff000000) >> 24);
+}
+
 u8* get_ustring(u8* data, u32 offset, u32 max_length){
 	u32 i;
 	u8* str;
@@ -132,7 +139,7 @@ void set_grass(u8* data, u8 ratio){
 	u32 max = ((16*16)*(5*4))*2;
 
 	for(i = 0; i < max; i++){
-		storeByte(data, 0x053e80+i, ratio);
+		storeByte(data, OFFSET_MAP_GRASS+i, ratio);
 	}
 }
 
@@ -175,12 +182,13 @@ void writeChecksums(u8* data){
 
 	updateChecksum(data, 0x80, 0x1c);
 	for(i = 0; i < 4; i++){
-		updateChecksum(data, 0xa0+(SIZE_PLAYER*i), 0x6b64);
-		updateChecksum(data, 0xa0+(SIZE_PLAYER*i)+0x6b68, 0x33a4);
+		updateChecksum(data, 0xa0+(SIZE_PLAYER*i), 0x6b84);
+		updateChecksum(data, 0xa0+(SIZE_PLAYER*i)+0x6b88, 0x38f4);
 	}
-	updateChecksum(data, 0x27ce0, 0x218b0);
-	updateChecksum(data, 0x495a0, 0x44b8);
-	updateChecksum(data, 0x4da5c, 0x1e420);
-	updateChecksum(data, 0x6be80, OFFSET_PLAYERS);
-	updateChecksum(data, 0x6bea4, 0x13af8);
+	updateChecksum(data, 0x0292a0, 0x022bc8);
+	updateChecksum(data, 0x04be80, 0x44b8);
+	updateChecksum(data, 0x053424, 0x01e4d8);
+	updateChecksum(data, 0x071900, 0x20);
+	updateChecksum(data, 0x071924, 0xbe4);
+	updateChecksum(data, 0x073954, 0x16188);
 }

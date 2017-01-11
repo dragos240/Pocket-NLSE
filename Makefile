@@ -152,7 +152,7 @@ $(BUILD):
 #---------------------------------------------------------------------------------
 clean:
 	echo clean ...
-	rm -rf $(BUILD) $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).elf $(TARGET).cia
+	rm -rf $(BUILD) $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).elf $(TARGET).cia *.zip Pocket-NLSE-*
 
 citra:
 	citra-qt $(TARGET).3dsx
@@ -165,10 +165,10 @@ cia:
 	@rm -f banner.bnr icon.icn
 
 zip:
-	rm -rf Pocket-NLSE-latest
-	mkdir Pocket-NLSE-latest
-	cp $(TARGET).3dsx $(OUTPUT).smdh Pocket-NLSE-latest
-	zip -r Pocket-NLSE-latest.zip Pocket-NLSE-latest/
+	rm -rf Pocket-NLSE
+	mkdir Pocket-NLSE
+	cp $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).cia $(TARGET).xml Pocket-NLSE/
+	zip -r Pocket-NLSE-latest.zip Pocket-NLSE/
 
 #---------------------------------------------------------------------------------
 else
