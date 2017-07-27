@@ -6,14 +6,8 @@
 
 #include <3ds.h>
 
-<<<<<<< Updated upstream:source/actions.c
-#include "common.h"
-#include "actions.h"
-#include "menu.h"
-=======
 #include "actions/simple.h"
 #include "core/constants.h"
->>>>>>> Stashed changes:source/actions/simple.c
 
 u8 data_offset = 0x80;
 
@@ -186,16 +180,6 @@ void writeChecksums(u8* data){
 
 	updateChecksum(data, 0x80, 0x1c);
 	for(i = 0; i < 4; i++){
-<<<<<<< Updated upstream:source/actions.c
-		updateChecksum(data, 0xa0+(SIZE_PLAYER*i), 0x6b64);
-		updateChecksum(data, 0xa0+(SIZE_PLAYER*i)+0x6b68, 0x33a4);
-	}
-	updateChecksum(data, 0x27ce0, 0x218b0);
-	updateChecksum(data, 0x495a0, 0x44b8);
-	updateChecksum(data, 0x4da5c, 0x1e420);
-	updateChecksum(data, 0x6be80, OFFSET_PLAYERS);
-	updateChecksum(data, 0x6bea4, 0x13af8);
-=======
 		updateChecksum(data, 0xa0+(SIZE_PLAYER*i), 0x6b84);
 		updateChecksum(data, 0xa0+(SIZE_PLAYER*i)+0x6b88, 0x38f4);
 	}
@@ -205,5 +189,4 @@ void writeChecksums(u8* data){
 	updateChecksum(data, 0x071900, 0x20);
 	updateChecksum(data, 0x071924, 0xbe4);
 	updateChecksum(data, 0x073954, 0x16188);
->>>>>>> Stashed changes:source/actions/simple.c
 }

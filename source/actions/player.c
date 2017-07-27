@@ -44,7 +44,7 @@ static list_item eyecolorMenu = {"Change eye color", COLOR_BLACK, eyecolorMenu_o
 static list_item facetypeMenu = {"Change face type", COLOR_BLACK, facetypeMenu_open};
 
 void tanMenu_open(list_item* selected){
-	list_display("Tan Menu", "A: Select, B: Go back", selected, tanMenu_update, genericMenu_draw_top);
+	//list_display("Tan Menu", "A: Select, B: Go back", selected, tanMenu_update, genericMenu_draw_top);
 }
 
 void hairstyleMenu_open(list_item* selected){

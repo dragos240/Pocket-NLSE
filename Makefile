@@ -166,17 +166,10 @@ cia:
 	@rm -f banner.bnr icon.icn
 
 zip:
-<<<<<<< Updated upstream
 	rm -rf Pocket-NLSE-latest
 	mkdir Pocket-NLSE-latest
 	cp $(TARGET).3dsx $(OUTPUT).smdh Pocket-NLSE-latest
 	zip -r Pocket-NLSE-latest.zip Pocket-NLSE-latest/
-=======
-	rm -rf Pocket-NLSE
-	mkdir Pocket-NLSE
-	cp $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).cia $(TARGET).xml Pocket-NLSE/
-	zip -r Pocket-NLSE-latest.zip Pocket-NLSE/
->>>>>>> Stashed changes
 
 #---------------------------------------------------------------------------------
 else

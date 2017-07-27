@@ -39,8 +39,3 @@ void set_grass(u8* data, u8 ratio);
 u32 gen_crc32(u8* bytes, s32 length);
 void updateChecksum(u8* data, u32 offset, u32 length);
 void writeChecksums(u8* data);
-<<<<<<< Updated upstream:include/actions.h
-
-#endif
-=======
->>>>>>> Stashed changes:include/actions/simple.h
