@@ -29,7 +29,7 @@ include $(DEVKITARM)/3ds_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source
+SOURCES		:=	source source/core source/actions source/actions/player source/actions/villager source/ui
 DATA		:=	data
 INCLUDES	:=	include
 ROMFS		:=	romfs
@@ -49,6 +49,7 @@ ARCH	:=	-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 
 CFLAGS	:=	-g -Wall -Wextra -O2 -mword-relocations \
 			-fomit-frame-pointer -ffunction-sections \
+			-Wno-misleading-indentation \
 			$(ARCH)
 
 CFLAGS	+=	$(INCLUDE) -DARM11 -D_3DS
@@ -58,7 +59,7 @@ CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=3dsx.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:= -lsfil -lsftd -lfreetype -lpng -lz -lsf2d -lcitro3d -lctru -lm
+LIBS	:=	-lcitro3d -lctru -lm
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -165,10 +166,17 @@ cia:
 	@rm -f banner.bnr icon.icn
 
 zip:
+<<<<<<< Updated upstream
+	rm -rf Pocket-NLSE-latest
+	mkdir Pocket-NLSE-latest
+	cp $(TARGET).3dsx $(OUTPUT).smdh Pocket-NLSE-latest
+	zip -r Pocket-NLSE-latest.zip Pocket-NLSE-latest/
+=======
 	rm -rf Pocket-NLSE
 	mkdir Pocket-NLSE
 	cp $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).cia $(TARGET).xml Pocket-NLSE/
 	zip -r Pocket-NLSE-latest.zip Pocket-NLSE/
+>>>>>>> Stashed changes
 
 #---------------------------------------------------------------------------------
 else
